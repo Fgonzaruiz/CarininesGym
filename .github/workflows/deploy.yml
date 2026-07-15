@@ -10,9 +10,11 @@ permissions:
   pages: write
   id-token: write
 
+# No cancelar despliegues en curso: evita que un "Run workflow" manual
+# mate otro deploy de Pages que ya estaba en cola.
 concurrency:
   group: "pages"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -24,7 +26,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
