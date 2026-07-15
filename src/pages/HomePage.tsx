@@ -9,15 +9,15 @@ import LoadingScreen from "../components/LoadingScreen";
 import type { WorkoutSession } from "../types/plan";
 
 const GREETINGS: Record<string, string[]> = {
+  Forky: [
+    "Hora de entrenar, Forky",
+    "Tu granja fitness te espera",
+    "A cosechar gains en la ruta",
+  ],
   Knifey: [
     "Hora de evolucionar, Knifey",
     "Fase Mewtwo te espera",
     "Piernotas legendarias incoming",
-  ],
-  Forky: [
-    "Buen dia en la granja fitness, Forky",
-    "A cosechar gains",
-    "Tu turno de entrenar",
   ],
 };
 
@@ -104,8 +104,10 @@ export default function HomePage() {
         </div>
       ) : (
         <div className="cozy-card p-6 text-center">
-          <p className="font-heading text-gray-600">
-            {isKnifey ? "Tu Fase Mewtwo se creara al conectar Supabase" : "Crea tu primer plan"}
+          <p className="font-heading text-wood-600">
+            {isKnifey
+              ? "Sus entrenos apareceran aqui al conectar Supabase"
+              : "Crea tu primer plan para empezar tus entrenos"}
           </p>
           <Link to="/planes" className="game-btn inline-block mt-3 px-6 py-2 text-sm">
             Ir a planes

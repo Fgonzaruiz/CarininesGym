@@ -1,4 +1,4 @@
-import { CARININES, type CarinineId } from "../types/profile";
+import { CARININES, CARININE_ORDER, type CarinineId } from "../types/profile";
 import { useProfileStore } from "../store/profileStore";
 import { isSupabaseConfigured } from "../lib/supabase";
 
@@ -6,12 +6,12 @@ function CarinineAvatar({ id }: { id: CarinineId }) {
   const isKnifey = id === "Knifey";
   return (
     <div
-      className={`w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-heading text-white shadow-lg border-3 ${
+      className={`w-20 h-20 rounded-xl flex items-center justify-center text-3xl font-heading text-white border-4 shrink-0 ${
         isKnifey
           ? "bg-gradient-to-br from-psychic-400 to-psychic-700 border-psychic-300"
           : "bg-gradient-to-br from-meadow-400 to-meadow-700 border-meadow-300"
       }`}
-      style={{ borderWidth: 3 }}
+      style={{ boxShadow: "inset 0 2px 0 rgba(255,255,255,0.4), 0 4px 0 rgba(0,0,0,0.15)" }}
     >
       {isKnifey ? "K" : "F"}
     </div>
@@ -22,11 +22,11 @@ export default function ChooseProfilePage() {
   const setProfile = useProfileStore((s) => s.setProfile);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-5 py-10 star-pattern">
+    <div className="game-bg min-h-screen flex items-center justify-center px-5 py-10 star-pattern">
       <div className="w-full max-w-md pop-in">
-        <div className="text-center mb-8">
-          <p className="text-xs font-heading uppercase tracking-widest text-meadow-600 mb-1">
-            Bienvenida al gimnasio
+        <div className="poke-panel p-6 mb-6 text-center">
+          <p className="text-xs font-heading uppercase tracking-widest text-poke-blue-600 mb-1">
+            Region Cariñines
           </p>
           <h1 className="font-heading text-4xl game-title">CariñinesGym</h1>
           <p className="text-wood-600 font-heading text-lg mt-3">
@@ -35,13 +35,13 @@ export default function ChooseProfilePage() {
         </div>
 
         {!isSupabaseConfigured && (
-          <div className="cozy-card p-4 mb-5 text-sm text-wood-700 bg-wood-50/80">
+          <div className="stardew-panel p-4 mb-5 text-sm text-wood-600">
             Conecta Supabase en <code>.env.local</code> para guardar entrenos en la nube.
           </div>
         )}
 
         <div className="flex flex-col gap-4">
-          {(Object.keys(CARININES) as CarinineId[]).map((id) => {
+          {CARININE_ORDER.map((id) => {
             const c = CARININES[id];
             const isKnifey = id === "Knifey";
             return (
@@ -54,14 +54,23 @@ export default function ChooseProfilePage() {
               >
                 <CarinineAvatar id={id} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-heading text-xl text-gray-800">{c.label}</p>
+                  <p className="font-heading text-xl text-wood-700">{c.label}</p>
                   <p className={`text-sm font-heading ${isKnifey ? "text-psychic-600" : "text-meadow-600"}`}>
                     {c.subtitle}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1 leading-snug">{c.description}</p>
+                  <p className="text-xs text-wood-500 mt-1 leading-snug">{c.description}</p>
+                  <span
+                    className={`chip inline-block mt-2 ${
+                      isKnifey
+                        ? "bg-psychic-100 text-psychic-700 border-psychic-300"
+                        : "bg-meadow-100 text-meadow-700 border-meadow-300"
+                    }`}
+                  >
+                    {c.tagline}
+                  </span>
                   {isKnifey && (
-                    <span className="chip inline-block mt-2 bg-psychic-100 text-psychic-700 border-psychic-200">
-                      Fase Mewtwo incluida
+                    <span className="chip inline-block mt-2 ml-1 bg-psychic-50 text-psychic-600 border-psychic-200">
+                      Fase Mewtwo
                     </span>
                   )}
                 </div>
@@ -70,8 +79,8 @@ export default function ChooseProfilePage() {
           })}
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-8">
-          Sin contrasenas. Cada carinin tiene sus propios planes y evolucion.
+        <p className="text-center text-xs text-wood-500 mt-8 px-4">
+          Forky: tus entrenos. Knifey: los suyos. Elige quien eres en este dispositivo.
         </p>
       </div>
     </div>

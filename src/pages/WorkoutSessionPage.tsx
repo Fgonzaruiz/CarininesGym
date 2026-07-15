@@ -205,7 +205,7 @@ export default function WorkoutSessionPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pt-4 pb-10 flex flex-col gap-4 min-h-screen">
+    <div className="game-bg min-h-screen max-w-3xl mx-auto px-4 pt-4 pb-10 flex flex-col gap-4">
       <button
         onClick={() => navigate(`/planes/${plan.id}`)}
         className="flex items-center gap-1 text-sm text-gray-500 font-heading self-start"
