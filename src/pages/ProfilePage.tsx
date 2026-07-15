@@ -28,7 +28,7 @@ export default function ProfilePage() {
             {name === "Knifey" ? "K" : "F"}
           </div>
           <p className="font-heading text-xl text-gray-800">{profile.label}</p>
-          <p className="text-sm text-gray-500">{profile.subtitle}</p>
+          <p className="text-sm text-gray-500">{profile.description}</p>
         </div>
       )}
 

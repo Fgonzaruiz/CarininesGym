@@ -1,7 +1,7 @@
 {
   "name": "CariñinesGym",
   "short_name": "CariñinesGym",
-  "description": "Gym personal para Knifey y Forky. Entrena, evoluciona y registra tu progreso.",
+  "description": "Gym personal para Knifey y Forky. Entrena y registra tu progreso.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

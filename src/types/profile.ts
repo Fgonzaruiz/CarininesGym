@@ -3,11 +3,17 @@ export type CarinineId = "Knifey" | "Forky";
 export interface CarinineProfile {
   id: CarinineId;
   label: string;
-  subtitle: string;
   accent: "knifey" | "forky";
   description: string;
-  /** Texto corto para la pantalla de seleccion */
-  tagline: string;
+}
+
+export interface CarinineVoice {
+  greetings: string[];
+  hypeMessages: string[];
+  finishNote: string;
+  weekUnlocked: (weekTitle: string) => string;
+  monthDone: string;
+  progressTitle: string;
 }
 
 /** Forky primero (el), Knifey segunda (ella) */
@@ -17,21 +23,60 @@ export const CARININES: Record<CarinineId, CarinineProfile> = {
   Forky: {
     id: "Forky",
     label: "Forky",
-    subtitle: "Tu aventura fitness",
     accent: "forky",
-    description: "Aqui van tus entrenamientos, tus planes y tu evolucion",
-    tagline: "Tus entrenos",
+    description: "Planes, entrenos y progreso",
   },
   Knifey: {
     id: "Knifey",
     label: "Knifey",
-    subtitle: "Entrenadora psiquica",
     accent: "knifey",
-    description: "Aqui van sus entrenamientos, la Fase Mewtwo y su progreso",
-    tagline: "Sus entrenos",
+    description: "Planes, entrenos y progreso · incluye Fase Mewtwo",
+  },
+};
+
+export const CARININE_VOICE: Record<CarinineId, CarinineVoice> = {
+  Forky: {
+    greetings: [
+      "Hora de entrenar, rey titan",
+      "A por esas gains, campeon",
+      "El gym te espera, rey",
+      "Vamos, titan, otro dia de leyenda",
+    ],
+    hypeMessages: [
+      "Entreno completado, rey titan",
+      "Otro dia de leyenda, campeon",
+      "Gains conseguidas, rey",
+      "A seguir creciendo, titan",
+    ],
+    finishNote: "Registrado, rey. Sigue asi.",
+    weekUnlocked: (week) => `Semana completada, titan. ${week}`,
+    monthDone: "Mes completado, rey. Nuevo ciclo.",
+    progressTitle: "Stats del titan",
+  },
+  Knifey: {
+    greetings: [
+      "Slay queeen, hora de brillar",
+      "Giiirl, el gym te espera",
+      "A darlo todo, queen",
+      "Piernotas mode, lets go girl",
+    ],
+    hypeMessages: [
+      "Slay total, queen",
+      "Giiirl, eso fue iconic",
+      "Entreno completado, slay",
+      "Queen mode activated, bien hecho",
+    ],
+    finishNote: "Registrado, girl. Tu progreso cuenta.",
+    weekUnlocked: (week) => `Slay week complete, queen. ${week}`,
+    monthDone: "Mes slayed, girl. Nuevo ciclo.",
+    progressTitle: "Stats de la queen",
   },
 };
 
 export function isCarinineId(value: string | null): value is CarinineId {
   return value === "Knifey" || value === "Forky";
+}
+
+export function pickRandom<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
 }

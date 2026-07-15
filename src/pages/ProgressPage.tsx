@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { TrendingUp, Trophy, Calendar, Dumbbell } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
-import { CARININES } from "../types/profile";
+import { CARININES, CARININE_VOICE, isCarinineId } from "../types/profile";
 import { fetchEvolution, fetchStats, type ExerciseEvolution } from "../lib/sessionsApi";
 import LoadingScreen from "../components/LoadingScreen";
 
@@ -21,7 +21,7 @@ export default function ProgressPage() {
       .finally(() => setLoading(false));
   }, [name]);
 
-  if (loading) return <LoadingScreen label="Calculando evolucion..." />;
+  if (loading) return <LoadingScreen label="Calculando progreso..." />;
 
   const profile = name ? CARININES[name] : null;
   const maxVolume = evolution[0]?.total_volume ?? 1;
@@ -30,10 +30,10 @@ export default function ProgressPage() {
     <div className="flex flex-col gap-5">
       <div>
         <p className="text-xs font-heading uppercase tracking-widest text-meadow-600">
-          Tu evolucion
+          Tu progreso
         </p>
         <h1 className="font-heading text-2xl game-title">
-          {profile?.label ?? name} · Pokedex de gains
+          {profile?.label ?? name} · {name && isCarinineId(name) ? CARININE_VOICE[name].progressTitle : "Stats"}
         </h1>
       </div>
 
@@ -55,7 +55,7 @@ export default function ProgressPage() {
       {evolution.length === 0 ? (
         <div className="cozy-card p-10 text-center">
           <TrendingUp size={40} className="mx-auto text-wood-300 mb-3" />
-          <p className="font-heading text-gray-600">Aun no hay datos de evolucion</p>
+          <p className="font-heading text-gray-600">Aun no hay datos de progreso</p>
           <p className="text-sm text-gray-400 mt-1">
             Completa un entreno registrando reps y peso en cada serie
           </p>

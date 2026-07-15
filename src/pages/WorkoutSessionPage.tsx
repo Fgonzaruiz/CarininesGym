@@ -14,6 +14,7 @@ import {
   onMewtwoSessionComplete,
 } from "../lib/mewtwoProgress";
 import type { PlanExercise } from "../types/plan";
+import { CARININE_VOICE, pickRandom, isCarinineId } from "../types/profile";
 import LoadingScreen from "../components/LoadingScreen";
 import ExercisePickerModal from "../components/ExercisePickerModal";
 import RestTimer from "../components/RestTimer";
@@ -24,13 +25,6 @@ interface SetState {
   weight: string;
   logId?: string;
 }
-
-const HYPE_MESSAGES = [
-  "Entreno completado, nivel legendario",
-  "Evolucion conseguida, carinin",
-  "Esas piernotas ya son Mewtwo tier",
-  "Slay total en el gimnasio de la granja",
-];
 
 export default function WorkoutSessionPage() {
   const { planId, dayId } = useParams<{ planId: string; dayId: string }>();
@@ -48,7 +42,12 @@ export default function WorkoutSessionPage() {
   const [finished, setFinished] = useState(false);
   const [weekAdvanceMessage, setWeekAdvanceMessage] = useState<string | null>(null);
   const [activeRest, setActiveRest] = useState<{ peId: string; seconds: number } | null>(null);
-  const [hypeMessage] = useState(HYPE_MESSAGES[Math.floor(Math.random() * HYPE_MESSAGES.length)]);
+  const [hypeMessage] = useState(() =>
+    name && isCarinineId(name) ? pickRandom(CARININE_VOICE[name].hypeMessages) : "Entreno completado"
+  );
+  const [finishNote] = useState(() =>
+    name && isCarinineId(name) ? CARININE_VOICE[name].finishNote : "Registrado en tu progreso."
+  );
 
   useEffect(() => {
     if (name) fetch(name);
@@ -160,10 +159,11 @@ export default function WorkoutSessionPage() {
       const after = onMewtwoSessionComplete(name, plan, history);
       if (after.week !== beforeWeek) {
         const meta = getWeekMeta(after.week);
+        const voice = isCarinineId(name) ? CARININE_VOICE[name] : null;
         setWeekAdvanceMessage(
           after.week === 1 && beforeWeek === 4
-            ? "Mes completado. Empieza un nuevo ciclo Mewtwo."
-            : `Semana desbloqueada: ${meta.title}`
+            ? voice?.monthDone ?? "Mes completado. Nuevo ciclo."
+            : voice?.weekUnlocked(meta.title) ?? `Semana desbloqueada: ${meta.title}`
         );
       }
     }
@@ -210,13 +210,15 @@ export default function WorkoutSessionPage() {
       <div className="min-h-screen star-pattern flex flex-col items-center justify-center text-center gap-4 px-6">
         <CheckCircle2 size={64} className="text-meadow-500" />
         <h1 className="font-heading text-2xl text-gray-800">{hypeMessage}</h1>
-        <p className="text-gray-500">"{day.name}" guardado. Tu evolucion ya cuenta.</p>
+        <p className="text-gray-500">"{day.name}" guardado. {finishNote}</p>
         {weekAdvanceMessage && (
-          <p className="text-sm font-heading text-psychic-600 px-4">{weekAdvanceMessage}</p>
+          <p className={`text-sm font-heading px-4 ${name === "Knifey" ? "text-psychic-600" : "text-meadow-600"}`}>
+            {weekAdvanceMessage}
+          </p>
         )}
         <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
           <Link to="/progreso" className="game-btn py-3 font-semibold flex items-center justify-center gap-2">
-            <TrendingUp size={18} /> Ver evolucion
+            <TrendingUp size={18} /> Ver progreso
           </Link>
           <button
             onClick={() => navigate(`/planes/${plan.id}`)}

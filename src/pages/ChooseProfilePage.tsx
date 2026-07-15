@@ -55,9 +55,6 @@ export default function ChooseProfilePage() {
                 <CarinineAvatar id={id} />
                 <div className="flex-1 min-w-0">
                   <p className="font-heading text-xl text-wood-700">{c.label}</p>
-                  <p className={`text-sm font-heading ${isKnifey ? "text-psychic-600" : "text-meadow-600"}`}>
-                    {c.subtitle}
-                  </p>
                   <p className="text-xs text-wood-500 mt-1 leading-snug">{c.description}</p>
                   <span
                     className={`chip inline-block mt-2 ${
@@ -66,13 +63,8 @@ export default function ChooseProfilePage() {
                         : "bg-meadow-100 text-meadow-700 border-meadow-300"
                     }`}
                   >
-                    {c.tagline}
+                    {c.label}
                   </span>
-                  {isKnifey && (
-                    <span className="chip inline-block mt-2 ml-1 bg-psychic-50 text-psychic-600 border-psychic-200">
-                      Fase Mewtwo
-                    </span>
-                  )}
                 </div>
               </button>
             );
@@ -80,7 +72,7 @@ export default function ChooseProfilePage() {
         </div>
 
         <p className="text-center text-xs text-wood-500 mt-8 px-4">
-          Forky: tus entrenos. Knifey: los suyos. Elige quien eres en este dispositivo.
+          Elige quien usa la app en este dispositivo. Cada perfil guarda su progreso por separado.
         </p>
       </div>
     </div>

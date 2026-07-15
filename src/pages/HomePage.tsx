@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Play, Dumbbell, ListChecks, Flame, TrendingUp } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
-import { CARININES } from "../types/profile";
+import { CARININES, CARININE_VOICE, pickRandom } from "../types/profile";
 import { fetchHistory, fetchStats } from "../lib/sessionsApi";
 import {
   getNextMewtwoDay,
@@ -14,19 +14,6 @@ import {
 import LoadingScreen from "../components/LoadingScreen";
 import type { WorkoutSession } from "../types/plan";
 
-const GREETINGS: Record<string, string[]> = {
-  Forky: [
-    "Hora de entrenar, Forky",
-    "Tu granja fitness te espera",
-    "A cosechar gains en la ruta",
-  ],
-  Knifey: [
-    "Hora de evolucionar, Knifey",
-    "Fase Mewtwo te espera",
-    "Piernotas legendarias incoming",
-  ],
-};
-
 export default function HomePage() {
   const name = useProfileStore((s) => s.name);
   const profile = name ? CARININES[name] : null;
@@ -34,7 +21,7 @@ export default function HomePage() {
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [stats, setStats] = useState<{ thisWeek: number; total: number } | null>(null);
   const [greeting] = useState(
-    name ? GREETINGS[name][Math.floor(Math.random() * GREETINGS[name].length)] : ""
+    name ? pickRandom(CARININE_VOICE[name].greetings) : ""
   );
 
   useEffect(() => {
@@ -81,10 +68,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col gap-5">
       <div className={`cozy-card p-5 ${isKnifey ? "knifey-card" : "forky-card"}`}>
-        <p className="text-xs font-heading uppercase tracking-widest text-gray-500">
-          {profile?.subtitle}
-        </p>
-        <h1 className="font-heading text-2xl text-gray-800 mt-1">
+        <h1 className="font-heading text-2xl text-gray-800">
           Hola, {profile?.label}
         </h1>
         <p className="text-sm text-gray-500 mt-1">{greeting}</p>
@@ -106,7 +90,7 @@ export default function HomePage() {
               <TrendingUp size={18} />
             </div>
             <div>
-              <p className="font-heading text-gray-800">Evolucion</p>
+              <p className="font-heading text-gray-800">Progreso</p>
               <p className="text-[11px] text-gray-500">Ver progreso</p>
             </div>
           </Link>
@@ -115,8 +99,8 @@ export default function HomePage() {
 
       {mewtwoWeek && (
         <div className="cozy-card p-4 knifey-card">
-          <p className="text-xs font-heading uppercase tracking-widest text-psychic-600">
-            Mes Mewtwo · Semana {mewtwoWeek.week} de 4
+          <p className="text-xs font-heading uppercase tracking-widest text-gray-500">
+            Fase Mewtwo · Semana {mewtwoWeek.week} de 4
           </p>
           <p className="font-heading text-gray-800 mt-1">{mewtwoWeek.title}</p>
           <p className="text-xs text-gray-500 mt-1">{mewtwoWeek.subtitle}</p>
@@ -144,9 +128,7 @@ export default function HomePage() {
       ) : (
         <div className="cozy-card p-6 text-center">
           <p className="font-heading text-wood-600">
-            {isKnifey
-              ? "Sus entrenos apareceran aqui al conectar Supabase"
-              : "Crea tu primer plan para empezar tus entrenos"}
+            Los entrenos apareceran aqui en cuanto tengas un plan listo
           </p>
           <Link to="/planes" className="game-btn inline-block mt-3 px-6 py-2 text-sm">
             Ir a planes

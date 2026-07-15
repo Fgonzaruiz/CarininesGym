@@ -27,7 +27,7 @@ export const MEWTWO_DAYS_PER_WEEK = 4;
 export const FASE_MEWTWO_PLAN = {
   name: "Fase Mewtwo",
   description:
-    "Mes de evolucion legendaria: 4 semanas que van subiendo de nivel mientras el codo descansa. Cada semana trae rutinas distintas enfocadas en piernas, abdomen, gemelos y cardio. Completa los 4 dias de la semana para desbloquear la siguiente fase.",
+    "Plan de 4 semanas que va subiendo de nivel mientras el codo descansa. Cada semana trae rutinas distintas enfocadas en piernas, abdomen, gemelos y cardio. Completa los 4 dias de la semana para desbloquear la siguiente.",
   weeks: [
     {
       week: 1,
@@ -87,7 +87,7 @@ export const FASE_MEWTWO_PLAN = {
     },
     {
       week: 2,
-      title: "Semana 2 - Evolucion",
+      title: "Semana 2 - Subiendo nivel",
       subtitle: "Mas volumen y variaciones nuevas para seguir progresando",
       days: [
         {
@@ -191,11 +191,11 @@ export const FASE_MEWTWO_PLAN = {
     },
     {
       week: 4,
-      title: "Semana 4 - Mewtwo legendario",
-      subtitle: "Pico del mes: maximo enfoque en piernotas, core y gemelos de cristal",
+      title: "Semana 4 - Tope del mes",
+      subtitle: "Pico del mes: maximo enfoque en piernas, core y gemelos",
       days: [
         {
-          name: "Cardio legendario",
+          name: "Cardio maximo",
           exercises: [
             { exercise_id: "3666", sets: 1, reps: "30-35 min", rest_seconds: 0, notes: "Tu mejor sesion de cardio del mes" },
             { exercise_id: "1460", sets: 4, reps: "14", rest_seconds: 45, notes: "Walking lunge, paso largo" },
@@ -216,7 +216,7 @@ export const FASE_MEWTWO_PLAN = {
           ],
         },
         {
-          name: "Gemelos de cristal",
+          name: "Gemelos maximo",
           exercises: [
             { exercise_id: "0594", sets: 5, reps: "22", rest_seconds: 35 },
             { exercise_id: "1373", sets: 5, reps: "28", rest_seconds: 30 },
@@ -226,7 +226,7 @@ export const FASE_MEWTWO_PLAN = {
           ],
         },
         {
-          name: "Piernas Mewtwo",
+          name: "Piernas finales",
           exercises: [
             { exercise_id: "0585", sets: 5, reps: "15", rest_seconds: 50 },
             { exercise_id: "0586", sets: 5, reps: "15", rest_seconds: 50 },
@@ -235,7 +235,7 @@ export const FASE_MEWTWO_PLAN = {
               sets: 5,
               reps: "10",
               rest_seconds: 90,
-              notes: "Peso maximo comodo del mes. Piernotas legendarias",
+              notes: "Peso maximo comodo del mes",
             },
             { exercise_id: "1489", sets: 4, reps: "12", rest_seconds: 55 },
             { exercise_id: "3523", sets: 4, reps: "18", rest_seconds: 45 },

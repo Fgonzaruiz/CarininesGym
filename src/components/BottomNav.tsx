@@ -4,7 +4,7 @@ import { Home, Dumbbell, ListChecks, TrendingUp, User } from "lucide-react";
 const items = [
   { to: "/", label: "Inicio", icon: Home },
   { to: "/planes", label: "Planes", icon: ListChecks },
-  { to: "/progreso", label: "Evolucion", icon: TrendingUp },
+  { to: "/progreso", label: "Progreso", icon: TrendingUp },
   { to: "/ejercicios", label: "Ejercicios", icon: Dumbbell },
   { to: "/perfil", label: "Perfil", icon: User },
 ];
