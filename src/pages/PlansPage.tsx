@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, ChevronRight, Crown, Dumbbell } from "lucide-react";
+import { Plus, ChevronRight, Crown, Dumbbell, Trash2 } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
 import * as api from "../lib/plansApi";
@@ -14,6 +14,7 @@ export default function PlansPage() {
   const [planName, setPlanName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (name) fetch(name);
@@ -30,6 +31,18 @@ export default function PlansPage() {
       await refresh(name);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(planId: string, planName: string) {
+    if (!name) return;
+    if (!confirm(`Borrar el plan "${planName}"? Se eliminara con todos sus dias.`)) return;
+    setDeletingId(planId);
+    try {
+      await api.deletePlan(planId);
+      await refresh(name);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -53,28 +66,40 @@ export default function PlansPage() {
 
       <div className="flex flex-col gap-3">
         {plans.map((plan) => (
-          <Link
+          <div
             key={plan.id}
-            to={`/planes/${plan.id}`}
-            className="kawaii-card p-4 flex items-center gap-3 active:scale-[0.98] transition"
+            className="kawaii-card p-4 flex items-center gap-3"
           >
-            <div className="w-11 h-11 rounded-2xl bg-bubble-50 flex items-center justify-center shrink-0">
-              <Dumbbell size={20} className="text-bubble-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <p className="font-heading text-bubble-700">{plan.name}</p>
-                {plan.is_default && (
-                  <span className="chip bg-pinky-100 text-pinky-500 flex items-center gap-1">
-                    <Crown size={10} /> default
-                  </span>
-                )}
+            <Link
+              to={`/planes/${plan.id}`}
+              className="flex items-center gap-3 flex-1 min-w-0 active:scale-[0.98] transition"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-bubble-50 flex items-center justify-center shrink-0">
+                <Dumbbell size={20} className="text-bubble-500" />
               </div>
-              <p className="text-xs text-bubble-400 line-clamp-1">{plan.description}</p>
-              <p className="text-[11px] text-bubble-300 mt-0.5">{plan.days.length} días</p>
-            </div>
-            <ChevronRight size={18} className="text-bubble-300 shrink-0" />
-          </Link>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-heading text-bubble-700">{plan.name}</p>
+                  {plan.is_default && (
+                    <span className="chip bg-pinky-100 text-pinky-500 flex items-center gap-1">
+                      <Crown size={10} /> default
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-bubble-400 line-clamp-1">{plan.description}</p>
+                <p className="text-[11px] text-bubble-300 mt-0.5">{plan.days.length} días</p>
+              </div>
+              <ChevronRight size={18} className="text-bubble-300 shrink-0" />
+            </Link>
+            <button
+              onClick={() => handleDelete(plan.id, plan.name)}
+              disabled={deletingId === plan.id}
+              className="p-2.5 rounded-xl border-2 border-pinky-200 text-pinky-500 shrink-0 active:scale-95 disabled:opacity-50"
+              aria-label={`Borrar plan ${plan.name}`}
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         ))}
 
         {plans.length === 0 && (

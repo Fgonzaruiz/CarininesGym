@@ -36,6 +36,7 @@ export const usePlansStore = create<PlansState>((set, get) => ({
   refresh: async (owner: string) => {
     set({ loading: true, error: null });
     try {
+      await api.seedDefaultPlanIfNeeded(owner);
       await api.upgradeMewtwoPlanIfNeeded(owner);
       const plans = await api.fetchPlans(owner);
       set({ plans, loading: false, loaded: true });

@@ -123,6 +123,12 @@ export default function PlanDetailPage() {
     await withRefresh(() => api.deletePlanDay(dayId));
   }
 
+  async function handleDeletePlan() {
+    if (!confirm(`Borrar el plan "${currentPlan.name}"? Se eliminara con todos sus dias.`)) return;
+    await withRefresh(() => api.deletePlan(currentPlan.id));
+    navigate("/planes");
+  }
+
   async function handlePickExercise(dayId: string, exerciseId: string) {
     const day = currentPlan.days.find((d) => d.id === dayId);
     await withRefresh(() =>
@@ -356,6 +362,14 @@ export default function PlanDetailPage() {
           </button>
         )}
       </div>
+
+      <button
+        onClick={handleDeletePlan}
+        disabled={busy}
+        className="flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-pinky-200 text-pinky-600 font-heading text-sm active:scale-[0.98] disabled:opacity-50"
+      >
+        <Trash2 size={16} /> Borrar plan
+      </button>
 
       {busy && (
         <p className="fixed bottom-24 sm:bottom-6 left-1/2 -translate-x-1/2 chip bg-bubble-600 text-white z-50">

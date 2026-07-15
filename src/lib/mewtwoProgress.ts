@@ -45,6 +45,10 @@ export function saveMewtwoProgress(owner: string, progress: MewtwoProgress): voi
   localStorage.setItem(storageKey(owner), JSON.stringify(progress));
 }
 
+export function clearMewtwoProgress(owner: string): void {
+  localStorage.removeItem(storageKey(owner));
+}
+
 export function getWeekDays(plan: Plan, week: number): PlanDay[] {
   const start = (week - 1) * MEWTWO_DAYS_PER_WEEK;
   const end = start + MEWTWO_DAYS_PER_WEEK;

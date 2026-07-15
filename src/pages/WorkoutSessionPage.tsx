@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { Check, Repeat, CheckCircle2, X, Plus, TrendingUp } from "lucide-react";
+import { Check, Repeat, CheckCircle2, X, Plus, TrendingUp, Play } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
 import { useExercises } from "../hooks/useExercises";
-import { findSimilarExercises } from "../lib/exercises";
+import {
+  findSimilarExercises,
+  exerciseUsesWeight,
+  parseTargetReps,
+  bodyPartLabel,
+} from "../lib/exercises";
+import type { Exercise } from "../types/exercise";
 import * as sessionsApi from "../lib/sessionsApi";
 import * as plansApi from "../lib/plansApi";
 import {
@@ -17,7 +23,9 @@ import type { PlanExercise } from "../types/plan";
 import { CARININE_VOICE, pickRandom, isCarinineId } from "../types/profile";
 import LoadingScreen from "../components/LoadingScreen";
 import ExercisePickerModal from "../components/ExercisePickerModal";
+import ExerciseDetailModal from "../components/ExerciseDetailModal";
 import RestTimer from "../components/RestTimer";
+import type { LastExerciseLog } from "../lib/sessionsApi";
 
 interface SetState {
   completed: boolean;
@@ -39,6 +47,8 @@ export default function WorkoutSessionPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sets, setSets] = useState<Record<string, SetState[]>>({});
   const [substituting, setSubstituting] = useState<PlanExercise | null>(null);
+  const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
+  const [lastLogs, setLastLogs] = useState<Map<string, LastExerciseLog>>(new Map());
   const [finished, setFinished] = useState(false);
   const [weekAdvanceMessage, setWeekAdvanceMessage] = useState<string | null>(null);
   const [activeRest, setActiveRest] = useState<{ peId: string; seconds: number } | null>(null);
@@ -54,6 +64,11 @@ export default function WorkoutSessionPage() {
   }, [name, fetch]);
 
   useEffect(() => {
+    if (!name) return;
+    sessionsApi.fetchLastLogsByExercise(name).then(setLastLogs).catch(() => {});
+  }, [name]);
+
+  useEffect(() => {
     if (!name || !plan || !day || sessionId) return;
     sessionsApi.startSession(name, plan.id, day.id, day.name).then((s) => setSessionId(s.id));
   }, [name, plan, day, sessionId]);
@@ -62,18 +77,40 @@ export default function WorkoutSessionPage() {
     if (!day) return;
     setSets((prev) => {
       const next = { ...prev };
+      let changed = false;
+
       for (const pe of day.exercises) {
+        const ex = exercises.find((e) => e.id === pe.exercise_id);
+        const last = lastLogs.get(pe.exercise_id);
+        const defaultReps = parseTargetReps(pe.reps) ?? last?.reps_done?.toString() ?? "";
+        const usesWeight = ex ? exerciseUsesWeight(pe.reps, ex.equipment) : true;
+        const defaultWeight = usesWeight && last?.weight_kg ? String(last.weight_kg) : "";
+
         if (!next[pe.id]) {
           next[pe.id] = Array.from({ length: pe.sets }, () => ({
             completed: false,
-            reps: "",
-            weight: "",
+            reps: defaultReps,
+            weight: defaultWeight,
           }));
+          changed = true;
+          continue;
         }
+
+        if (lastLogs.size === 0 && !defaultReps) continue;
+
+        next[pe.id] = next[pe.id].map((s) => {
+          if (s.completed) return s;
+          const reps = s.reps || defaultReps;
+          const weight = s.weight || defaultWeight;
+          if (reps === s.reps && weight === s.weight) return s;
+          changed = true;
+          return { ...s, reps, weight };
+        });
       }
-      return next;
+
+      return changed ? next : prev;
     });
-  }, [day]);
+  }, [day, exercises, lastLogs]);
 
   const exerciseMap = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
 
@@ -257,22 +294,58 @@ export default function WorkoutSessionPage() {
         if (!ex) return null;
         const exSets = sets[pe.id] ?? [];
         const showRest = activeRest?.peId === pe.id;
+        const usesWeight = exerciseUsesWeight(pe.reps, ex.equipment);
+        const last = lastLogs.get(pe.exercise_id);
+        const recommendedWeight = usesWeight
+          ? last?.weight_kg
+            ? `${last.weight_kg} kg`
+            : "Sin historial"
+          : ex.equipment === "body weight"
+            ? "Peso corporal"
+            : "—";
+        const instructionPreview =
+          ex.steps_es[0] ?? ex.instructions_es.slice(0, 140) + (ex.instructions_es.length > 140 ? "…" : "");
 
         return (
           <div key={pe.id} className="cozy-card p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <img
-                src={`${import.meta.env.BASE_URL}${ex.image ?? ""}`}
-                alt={ex.name}
-                loading="lazy"
-                className="w-16 h-16 rounded-xl object-cover bg-meadow-50 border-2 border-wood-100"
-              />
+            <div className="flex items-start gap-3 mb-3">
+              <button
+                type="button"
+                onClick={() => setDetailExercise(ex)}
+                className="relative shrink-0 rounded-xl overflow-hidden border-2 border-wood-100 active:scale-[0.97] transition"
+                aria-label="Ver ejercicio en movimiento"
+              >
+                <img
+                  src={`${import.meta.env.BASE_URL}${ex.image ?? ""}`}
+                  alt={ex.name}
+                  loading="lazy"
+                  className="w-20 h-20 object-cover bg-meadow-50"
+                />
+                {ex.gif && (
+                  <span className="absolute inset-0 flex flex-col items-center justify-center bg-black/35 text-white gap-0.5">
+                    <Play size={18} fill="white" />
+                    <span className="text-[9px] font-heading">Ver GIF</span>
+                  </span>
+                )}
+              </button>
               <div className="flex-1 min-w-0">
-                <p className="font-heading text-gray-800 capitalize truncate">{ex.name}</p>
-                <p className="text-xs text-gray-500">
-                  Objetivo: {pe.sets} x {pe.reps} · descanso {pe.rest_seconds}s
-                </p>
-                {pe.notes && <p className="text-[11px] text-psychic-600 mt-0.5">{pe.notes}</p>}
+                <p className="font-heading text-gray-800 capitalize">{ex.name}</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-[11px]">
+                  <p className="text-gray-500">
+                    <span className="text-gray-400">Series:</span> {pe.sets} x {pe.reps}
+                  </p>
+                  <p className="text-gray-500">
+                    <span className="text-gray-400">Descanso:</span> {pe.rest_seconds}s
+                  </p>
+                  <p className="text-gray-500">
+                    <span className="text-gray-400">Peso rec.:</span>{" "}
+                    <span className="font-heading text-meadow-700">{recommendedWeight}</span>
+                  </p>
+                  <p className="text-gray-500 capitalize truncate">
+                    <span className="text-gray-400">Zona:</span> {bodyPartLabel(ex.body_part)}
+                  </p>
+                </div>
+                {pe.notes && <p className="text-[11px] text-psychic-600 mt-1.5">{pe.notes}</p>}
               </div>
               <button
                 onClick={() => setSubstituting(pe)}
@@ -282,6 +355,19 @@ export default function WorkoutSessionPage() {
                 <Repeat size={16} />
               </button>
             </div>
+
+            {instructionPreview && (
+              <button
+                type="button"
+                onClick={() => setDetailExercise(ex)}
+                className="w-full text-left mb-3 p-3 rounded-xl bg-wood-50/80 border border-wood-100 active:scale-[0.99] transition"
+              >
+                <p className="text-[10px] font-heading uppercase tracking-wide text-gray-400 mb-1">
+                  Como se hace · pulsa para ver completo
+                </p>
+                <p className="text-xs text-gray-600 leading-relaxed line-clamp-2">{instructionPreview}</p>
+              </button>
+            )}
 
             <div className="flex flex-col gap-2">
               {exSets.map((s, idx) => (
@@ -302,8 +388,8 @@ export default function WorkoutSessionPage() {
                     <Check size={16} />
                   </button>
                   <span className="text-xs font-heading text-gray-500 w-12 shrink-0">S{idx + 1}</span>
-                  <div className="flex-1 flex gap-1.5">
-                    <div className="flex-1">
+                  <div className={`flex-1 flex gap-1.5 ${usesWeight ? "" : "justify-center"}`}>
+                    <div className={usesWeight ? "flex-1" : "flex-[2]"}>
                       <label className="text-[10px] text-gray-400 block">Reps</label>
                       <input
                         value={s.reps}
@@ -314,17 +400,19 @@ export default function WorkoutSessionPage() {
                         className="w-full rounded-lg border border-wood-200 px-2 py-1.5 text-sm text-center outline-none focus:border-meadow-400 bg-white"
                       />
                     </div>
-                    <div className="flex-1">
-                      <label className="text-[10px] text-gray-400 block">Kg</label>
-                      <input
-                        value={s.weight}
-                        onChange={(e) => updateField(pe.id, idx, "weight", e.target.value)}
-                        onBlur={() => saveFieldOnBlur(pe.id, idx, pe.exercise_id, ex.name)}
-                        placeholder="0"
-                        inputMode="decimal"
-                        className="w-full rounded-lg border border-wood-200 px-2 py-1.5 text-sm text-center outline-none focus:border-meadow-400 bg-white"
-                      />
-                    </div>
+                    {usesWeight && (
+                      <div className="flex-1">
+                        <label className="text-[10px] text-gray-400 block">Kg</label>
+                        <input
+                          value={s.weight}
+                          onChange={(e) => updateField(pe.id, idx, "weight", e.target.value)}
+                          onBlur={() => saveFieldOnBlur(pe.id, idx, pe.exercise_id, ex.name)}
+                          placeholder={last?.weight_kg ? String(last.weight_kg) : "0"}
+                          inputMode="decimal"
+                          className="w-full rounded-lg border border-wood-200 px-2 py-1.5 text-sm text-center outline-none focus:border-meadow-400 bg-white"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -359,6 +447,12 @@ export default function WorkoutSessionPage() {
         onPick={(ex) => handleSubstitute(ex.id)}
         title="Sustituir por..."
         suggested={substituteSuggestions}
+      />
+
+      <ExerciseDetailModal
+        exercise={detailExercise}
+        open={!!detailExercise}
+        onClose={() => setDetailExercise(null)}
       />
     </div>
   );

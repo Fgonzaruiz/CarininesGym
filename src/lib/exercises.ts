@@ -98,3 +98,21 @@ export function findSimilarExercises(
   );
   return [...sameTarget, ...sameBodyPart].slice(0, limit);
 }
+
+export interface LastExerciseLog {
+  weight_kg: number | null;
+  reps_done: number | null;
+}
+
+/** Cardio o tiempo: no pide peso en kg. */
+export function exerciseUsesWeight(reps: string, equipment: string): boolean {
+  if (/min|seg|sec/i.test(reps)) return false;
+  if (equipment === "body weight") return false;
+  return true;
+}
+
+/** Primer numero del objetivo del plan (ej. "12" de "12-15"). */
+export function parseTargetReps(reps: string): string | null {
+  const match = reps.match(/^(\d+)/);
+  return match ? match[1] : null;
+}
