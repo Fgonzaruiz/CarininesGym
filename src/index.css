@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@theme {
+  --font-heading: "Baloo 2", "Quicksand", sans-serif;
+  --font-body: "Quicksand", sans-serif;
+
+  --color-bubble-50: #f5f3ff;
+  --color-bubble-100: #ede9fe;
+  --color-bubble-200: #ddd6fe;
+  --color-bubble-300: #c4b5fd;
+  --color-bubble-400: #a78bfa;
+  --color-bubble-500: #8b5cf6;
+  --color-bubble-600: #7c3aed;
+  --color-bubble-700: #6d28d9;
+
+  --color-sky-glow-50: #eff6ff;
+  --color-sky-glow-100: #dbeafe;
+  --color-sky-glow-200: #bfdbfe;
+  --color-sky-glow-300: #93c5fd;
+  --color-sky-glow-400: #60a5fa;
+  --color-sky-glow-500: #3b82f6;
+
+  --color-pinky-100: #fce7f3;
+  --color-pinky-200: #fbcfe8;
+  --color-pinky-300: #f9a8d4;
+  --color-pinky-400: #f472b6;
+  --color-pinky-500: #ec4899;
+}
+
+html,
+body {
+  background: linear-gradient(160deg, #eff6ff 0%, #f5f3ff 45%, #fdf2ff 100%);
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: #4c1d95;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+* {
+  -webkit-text-size-adjust: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+::selection {
+  background: var(--color-bubble-200);
+}
+
+/* Scrollbar cute */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-bubble-300);
+  border-radius: 999px;
+}
+
+.kawaii-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(196, 181, 253, 0.5);
+  border-radius: 1.5rem;
+  box-shadow: 0 8px 24px -8px rgba(139, 92, 246, 0.25);
+}
+
+.btn-kawaii {
+  background: linear-gradient(120deg, var(--color-sky-glow-400), var(--color-bubble-500));
+  color: white;
+  font-family: var(--font-heading);
+  border-radius: 999px;
+  box-shadow: 0 10px 20px -8px rgba(139, 92, 246, 0.55);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-kawaii:active {
+  transform: scale(0.96);
+  box-shadow: 0 4px 10px -4px rgba(139, 92, 246, 0.5);
+}
+
+.chip {
+  border-radius: 999px;
+  font-family: var(--font-heading);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.75rem;
+  white-space: nowrap;
+}
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.pop-in {
+  animation: pop-in 0.25s ease-out;
+}
