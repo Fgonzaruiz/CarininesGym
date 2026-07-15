@@ -2,9 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// Base relativa para que funcione en GitHub Pages sea cual sea el nombre del repo,
-// ya usamos HashRouter asi que las rutas no dependen del path.
+// GitHub Pages sirve el repo en /appgym/ (subpath). HashRouter evita problemas de rutas.
 export default defineConfig({
-  base: "./",
+  base: "/appgym/",
   plugins: [react(), tailwindcss()],
 });
