@@ -1,4 +1,4 @@
-# AppGym - tu gym queen app
+# CariñinesGym
 
 Una app personal de entrenamiento, kawaii y girlie, hecha para dos. Planes de
 entrenamiento detallados, más de 1300 ejercicios con gif e instrucciones en
@@ -110,7 +110,7 @@ npm run prepare-data -- --source "../exercises-dataset"
 4. Haz push a `main`. El workflow en
    [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) compila y
    publica automáticamente. Tu app quedará en
-   `https://tu-usuario.github.io/tu-repo/`.
+   `https://fgonzaruiz.github.io/CarininesGym/`.
 
 ### Opción B - manual con `gh-pages`
 

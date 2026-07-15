@@ -1,4 +1,4 @@
-name: Deploy AppGym a GitHub Pages
+name: Deploy CariñinesGym a GitHub Pages
 
 on:
   push:
