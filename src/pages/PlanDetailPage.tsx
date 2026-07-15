@@ -18,6 +18,12 @@ import { useExercises } from "../hooks/useExercises";
 import { getExerciseById, findSimilarExercises } from "../lib/exercises";
 import * as api from "../lib/plansApi";
 import type { PlanExercise } from "../types/plan";
+import {
+  isMewtwoMonthPlan,
+  loadMewtwoProgress,
+  getWeekDays,
+  getWeekMeta,
+} from "../lib/mewtwoProgress";
 import LoadingScreen from "../components/LoadingScreen";
 import Modal from "../components/Modal";
 import ExercisePickerModal from "../components/ExercisePickerModal";
@@ -44,14 +50,36 @@ export default function PlanDetailPage() {
   }, [name]);
 
   useEffect(() => {
-    if (plan && !openDay && plan.days.length > 0) setOpenDay(plan.days[0].id);
-  }, [plan, openDay]);
+    if (plan && !openDay && plan.days.length > 0) {
+      if (name && isMewtwoMonthPlan(plan)) {
+        const progress = loadMewtwoProgress(name);
+        const weekDays = getWeekDays(plan, progress.week);
+        setOpenDay(weekDays[0]?.id ?? plan.days[0].id);
+      } else {
+        setOpenDay(plan.days[0].id);
+      }
+    }
+  }, [plan, openDay, name]);
 
   const exerciseMap = useMemo(() => {
     const map = new Map<string, ReturnType<typeof getExerciseById>>();
     for (const ex of exercises) map.set(ex.id, ex);
     return map;
   }, [exercises]);
+
+  const mewtwoProgress = useMemo(() => {
+    if (!name || !plan || !isMewtwoMonthPlan(plan)) return null;
+    return loadMewtwoProgress(name);
+  }, [name, plan]);
+
+  const mewtwoWeekGroups = useMemo(() => {
+    if (!plan || !isMewtwoMonthPlan(plan)) return null;
+    return [1, 2, 3, 4].map((week) => ({
+      week,
+      meta: getWeekMeta(week),
+      days: getWeekDays(plan, week),
+    }));
+  }, [plan]);
 
   if (!name || exercisesLoading || (plans.length === 0 && !plan)) {
     return <LoadingScreen label="Preparando tu plan..." />;
@@ -150,6 +178,120 @@ export default function PlanDetailPage() {
       })()
     : [];
 
+  function renderDayCard(day: (typeof currentPlan.days)[number], dayIdx: number) {
+    const isOpen = openDay === day.id;
+    return (
+      <div key={day.id} className="kawaii-card overflow-hidden">
+        <button
+          onClick={() => setOpenDay(isOpen ? null : day.id)}
+          className="w-full flex items-center gap-3 p-4 text-left"
+        >
+          <span className="w-8 h-8 rounded-full bg-bubble-100 text-bubble-600 font-heading text-sm flex items-center justify-center shrink-0">
+            {dayIdx + 1}
+          </span>
+          <div className="flex-1">
+            <p className="font-heading text-bubble-700">{day.name}</p>
+            <p className="text-xs text-bubble-400">{day.exercises.length} ejercicios</p>
+          </div>
+          {isOpen ? (
+            <ChevronUp size={18} className="text-bubble-300" />
+          ) : (
+            <ChevronDown size={18} className="text-bubble-300" />
+          )}
+        </button>
+
+        {isOpen && (
+          <div className="px-4 pb-4 flex flex-col gap-2.5">
+            {day.exercises.map((pe) => {
+              const ex = exerciseMap.get(pe.exercise_id);
+              if (!ex) return null;
+              return (
+                <div
+                  key={pe.id}
+                  className="flex items-center gap-2.5 bg-bubble-50/70 rounded-2xl p-2.5"
+                >
+                  <img
+                    src={`${import.meta.env.BASE_URL}${ex.image ?? ""}`}
+                    alt={ex.name}
+                    loading="lazy"
+                    className="w-12 h-12 rounded-xl object-cover bg-white shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-heading text-sm text-bubble-700 capitalize truncate">
+                      {ex.name}
+                    </p>
+                    <p className="text-xs text-bubble-400">
+                      {pe.sets} x {pe.reps} · descanso {pe.rest_seconds}s
+                    </p>
+                    {pe.notes && (
+                      <p className="text-[11px] text-pinky-500 mt-0.5">{pe.notes}</p>
+                    )}
+                    {pe.substituted_at && (
+                      <button
+                        onClick={() => handleRestore(pe)}
+                        className="text-[11px] text-sky-glow-500 flex items-center gap-0.5 mt-0.5"
+                      >
+                        <RotateCcw size={10} /> sustituido, restaurar original
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button
+                      onClick={() => setEditingExercise(pe)}
+                      className="p-1.5 rounded-full bg-white text-bubble-500"
+                      aria-label="Editar"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => setSubstitutingExercise(pe)}
+                      className="p-1.5 rounded-full bg-white text-sky-glow-500"
+                      aria-label="Sustituir"
+                    >
+                      <Repeat size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleRemoveExercise(pe.id)}
+                      className="p-1.5 rounded-full bg-white text-pinky-500"
+                      aria-label="Eliminar"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="flex gap-2 mt-1">
+              <button
+                onClick={() => setPickerForDay(day.id)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full border-2 border-dashed border-bubble-200 text-bubble-500 text-sm font-heading"
+              >
+                <Plus size={16} /> Añadir ejercicio
+              </button>
+              <button
+                onClick={() => handleDeleteDay(day.id)}
+                className="px-3.5 rounded-full border-2 border-dashed border-pinky-200 text-pinky-400"
+                aria-label="Borrar día"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+
+            {day.exercises.length > 0 && (
+              <button
+                onClick={() => navigate(`/entrenar/${currentPlan.id}/${day.id}`)}
+                className="btn-kawaii py-3 font-semibold flex items-center justify-center gap-2 mt-1"
+              >
+                <Play size={16} /> Empezar entreno
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <button
@@ -174,129 +316,45 @@ export default function PlanDetailPage() {
         {plan.description && (
           <p className="text-sm text-bubble-500 mt-3 leading-relaxed">{plan.description}</p>
         )}
+        {mewtwoProgress && (
+          <p className="text-xs font-heading text-psychic-600 mt-3">
+            Semana activa: {getWeekMeta(mewtwoProgress.week).title}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-3">
-        {plan.days.map((day, dayIdx) => {
-          const isOpen = openDay === day.id;
-          return (
-            <div key={day.id} className="kawaii-card overflow-hidden">
-              <button
-                onClick={() => setOpenDay(isOpen ? null : day.id)}
-                className="w-full flex items-center gap-3 p-4 text-left"
-              >
-                <span className="w-8 h-8 rounded-full bg-bubble-100 text-bubble-600 font-heading text-sm flex items-center justify-center shrink-0">
-                  {dayIdx + 1}
-                </span>
-                <div className="flex-1">
-                  <p className="font-heading text-bubble-700">{day.name}</p>
-                  <p className="text-xs text-bubble-400">{day.exercises.length} ejercicios</p>
-                </div>
-                {isOpen ? (
-                  <ChevronUp size={18} className="text-bubble-300" />
-                ) : (
-                  <ChevronDown size={18} className="text-bubble-300" />
-                )}
-              </button>
-
-              {isOpen && (
-                <div className="px-4 pb-4 flex flex-col gap-2.5">
-                  {day.exercises.map((pe) => {
-                    const ex = exerciseMap.get(pe.exercise_id);
-                    if (!ex) return null;
-                    return (
-                      <div
-                        key={pe.id}
-                        className="flex items-center gap-2.5 bg-bubble-50/70 rounded-2xl p-2.5"
-                      >
-                        <img
-                          src={`${import.meta.env.BASE_URL}${ex.image ?? ""}`}
-                          alt={ex.name}
-                          loading="lazy"
-                          className="w-12 h-12 rounded-xl object-cover bg-white shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-heading text-sm text-bubble-700 capitalize truncate">
-                            {ex.name}
-                          </p>
-                          <p className="text-xs text-bubble-400">
-                            {pe.sets} x {pe.reps} · descanso {pe.rest_seconds}s
-                          </p>
-                          {pe.notes && (
-                            <p className="text-[11px] text-pinky-500 mt-0.5">{pe.notes}</p>
-                          )}
-                          {pe.substituted_at && (
-                            <button
-                              onClick={() => handleRestore(pe)}
-                              className="text-[11px] text-sky-glow-500 flex items-center gap-0.5 mt-0.5"
-                            >
-                              <RotateCcw size={10} /> sustituido, restaurar original
-                            </button>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-1 shrink-0">
-                          <button
-                            onClick={() => setEditingExercise(pe)}
-                            className="p-1.5 rounded-full bg-white text-bubble-500"
-                            aria-label="Editar"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => setSubstitutingExercise(pe)}
-                            className="p-1.5 rounded-full bg-white text-sky-glow-500"
-                            aria-label="Sustituir"
-                          >
-                            <Repeat size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleRemoveExercise(pe.id)}
-                            className="p-1.5 rounded-full bg-white text-pinky-500"
-                            aria-label="Eliminar"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <div className="flex gap-2 mt-1">
-                    <button
-                      onClick={() => setPickerForDay(day.id)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full border-2 border-dashed border-bubble-200 text-bubble-500 text-sm font-heading"
-                    >
-                      <Plus size={16} /> Añadir ejercicio
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDay(day.id)}
-                      className="px-3.5 rounded-full border-2 border-dashed border-pinky-200 text-pinky-400"
-                      aria-label="Borrar día"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-
-                  {day.exercises.length > 0 && (
-                    <button
-                      onClick={() => navigate(`/entrenar/${plan.id}/${day.id}`)}
-                      className="btn-kawaii py-3 font-semibold flex items-center justify-center gap-2 mt-1"
-                    >
-                      <Play size={16} /> Empezar entreno
-                    </button>
+        {mewtwoWeekGroups
+          ? mewtwoWeekGroups.map((group) => (
+              <div key={group.week} className="flex flex-col gap-2">
+                <div
+                  className={`rounded-2xl px-4 py-3 ${
+                    group.week === mewtwoProgress?.week
+                      ? "bg-psychic-50 border border-psychic-200"
+                      : "bg-bubble-50/60"
+                  }`}
+                >
+                  <p className="font-heading text-bubble-700">{group.meta.title}</p>
+                  <p className="text-xs text-bubble-400 mt-0.5">{group.meta.subtitle}</p>
+                  {group.week === mewtwoProgress?.week && (
+                    <span className="inline-block mt-2 chip bg-psychic-100 text-psychic-700 text-[11px]">
+                      Semana actual
+                    </span>
                   )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+                {group.days.map((day, idx) => renderDayCard(day, idx))}
+              </div>
+            ))
+          : plan.days.map((day, dayIdx) => renderDayCard(day, dayIdx))}
 
-        <button
-          onClick={() => setAddingDay(true)}
-          className="flex items-center justify-center gap-1.5 py-3 rounded-full border-2 border-dashed border-bubble-200 text-bubble-500 text-sm font-heading"
-        >
-          <Plus size={16} /> Añadir día
-        </button>
+        {!mewtwoWeekGroups && (
+          <button
+            onClick={() => setAddingDay(true)}
+            className="flex items-center justify-center gap-1.5 py-3 rounded-full border-2 border-dashed border-bubble-200 text-bubble-500 text-sm font-heading"
+          >
+            <Plus size={16} /> Añadir día
+          </button>
+        )}
       </div>
 
       {busy && (

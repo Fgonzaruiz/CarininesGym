@@ -7,6 +7,12 @@ import { useExercises } from "../hooks/useExercises";
 import { findSimilarExercises } from "../lib/exercises";
 import * as sessionsApi from "../lib/sessionsApi";
 import * as plansApi from "../lib/plansApi";
+import {
+  isMewtwoMonthPlan,
+  loadMewtwoProgress,
+  getWeekMeta,
+  onMewtwoSessionComplete,
+} from "../lib/mewtwoProgress";
 import type { PlanExercise } from "../types/plan";
 import LoadingScreen from "../components/LoadingScreen";
 import ExercisePickerModal from "../components/ExercisePickerModal";
@@ -40,6 +46,7 @@ export default function WorkoutSessionPage() {
   const [sets, setSets] = useState<Record<string, SetState[]>>({});
   const [substituting, setSubstituting] = useState<PlanExercise | null>(null);
   const [finished, setFinished] = useState(false);
+  const [weekAdvanceMessage, setWeekAdvanceMessage] = useState<string | null>(null);
   const [activeRest, setActiveRest] = useState<{ peId: string; seconds: number } | null>(null);
   const [hypeMessage] = useState(HYPE_MESSAGES[Math.floor(Math.random() * HYPE_MESSAGES.length)]);
 
@@ -146,6 +153,21 @@ export default function WorkoutSessionPage() {
 
   async function handleFinish() {
     if (sessionId) await sessionsApi.completeSession(sessionId);
+
+    if (name && plan && isMewtwoMonthPlan(plan)) {
+      const history = await sessionsApi.fetchHistory(name, 80);
+      const beforeWeek = loadMewtwoProgress(name).week;
+      const after = onMewtwoSessionComplete(name, plan, history);
+      if (after.week !== beforeWeek) {
+        const meta = getWeekMeta(after.week);
+        setWeekAdvanceMessage(
+          after.week === 1 && beforeWeek === 4
+            ? "Mes completado. Empieza un nuevo ciclo Mewtwo."
+            : `Semana desbloqueada: ${meta.title}`
+        );
+      }
+    }
+
     setFinished(true);
   }
 
@@ -189,6 +211,9 @@ export default function WorkoutSessionPage() {
         <CheckCircle2 size={64} className="text-meadow-500" />
         <h1 className="font-heading text-2xl text-gray-800">{hypeMessage}</h1>
         <p className="text-gray-500">"{day.name}" guardado. Tu evolucion ya cuenta.</p>
+        {weekAdvanceMessage && (
+          <p className="text-sm font-heading text-psychic-600 px-4">{weekAdvanceMessage}</p>
+        )}
         <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
           <Link to="/progreso" className="game-btn py-3 font-semibold flex items-center justify-center gap-2">
             <TrendingUp size={18} /> Ver evolucion

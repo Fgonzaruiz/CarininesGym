@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
-import { FASE_MEWTWO_PLAN } from "../data/defaultPlan";
+import { FASE_MEWTWO_FLAT_DAYS, FASE_MEWTWO_PLAN } from "../data/defaultPlan";
+import type { SeedDay } from "../data/defaultPlan";
 import type { Plan, PlanDay, PlanExercise } from "../types/plan";
 
 interface RawPlanRow {
@@ -106,13 +107,21 @@ export async function seedDefaultPlanIfNeeded(owner: string): Promise<void> {
     .single();
   if (planError) throw planError;
 
-  for (let i = 0; i < FASE_MEWTWO_PLAN.days.length; i++) {
-    const day = FASE_MEWTWO_PLAN.days[i];
+  await insertMewtwoDays(plan.id, FASE_MEWTWO_FLAT_DAYS, 0);
+}
+
+async function insertMewtwoDays(
+  planId: string,
+  days: SeedDay[],
+  startIndex: number
+): Promise<void> {
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i];
     const { data: dayRow, error: dayError } = await supabase
       .from("plan_days")
       .insert({
-        plan_id: plan.id,
-        day_index: i,
+        plan_id: planId,
+        day_index: startIndex + i,
         name: day.name,
       })
       .select()
@@ -135,6 +144,43 @@ export async function seedDefaultPlanIfNeeded(owner: string): Promise<void> {
       if (exError) throw exError;
     }
   }
+}
+
+/** Añade semanas 2-4 si Knifey ya tenia el plan antiguo de 4 dias. */
+export async function upgradeMewtwoPlanIfNeeded(owner: string): Promise<void> {
+  if (owner !== "Knifey") return;
+
+  const { data: plans, error: plansError } = await supabase
+    .from("plans")
+    .select("id, name, description")
+    .eq("owner", owner)
+    .eq("is_default", true);
+  if (plansError) throw plansError;
+
+  const mewtwo = (plans ?? []).find((p) => p.name === FASE_MEWTWO_PLAN.name);
+  if (!mewtwo) return;
+
+  const { data: days, error: daysError } = await supabase
+    .from("plan_days")
+    .select("id")
+    .eq("plan_id", mewtwo.id)
+    .order("day_index", { ascending: true });
+  if (daysError) throw daysError;
+
+  const dayCount = days?.length ?? 0;
+  const targetCount = FASE_MEWTWO_FLAT_DAYS.length;
+
+  if (mewtwo.description !== FASE_MEWTWO_PLAN.description) {
+    await supabase
+      .from("plans")
+      .update({ description: FASE_MEWTWO_PLAN.description })
+      .eq("id", mewtwo.id);
+  }
+
+  if (dayCount >= targetCount) return;
+
+  const missingDays = FASE_MEWTWO_FLAT_DAYS.slice(dayCount);
+  await insertMewtwoDays(mewtwo.id, missingDays, dayCount);
 }
 
 export async function createPlan(
