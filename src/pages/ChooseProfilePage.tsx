@@ -1,94 +1,77 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { CARININES, type CarinineId } from "../types/profile";
 import { useProfileStore } from "../store/profileStore";
-import { supabase, isSupabaseConfigured } from "../lib/supabase";
+import { isSupabaseConfigured } from "../lib/supabase";
+
+function CarinineAvatar({ id }: { id: CarinineId }) {
+  const isKnifey = id === "Knifey";
+  return (
+    <div
+      className={`w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-heading text-white shadow-lg border-3 ${
+        isKnifey
+          ? "bg-gradient-to-br from-psychic-400 to-psychic-700 border-psychic-300"
+          : "bg-gradient-to-br from-meadow-400 to-meadow-700 border-meadow-300"
+      }`}
+      style={{ borderWidth: 3 }}
+    >
+      {isKnifey ? "K" : "F"}
+    </div>
+  );
+}
 
 export default function ChooseProfilePage() {
-  const setName = useProfileStore((s) => s.setName);
-  const [input, setInput] = useState("");
-  const [existingNames, setExistingNames] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    supabase
-      .from("plans")
-      .select("owner")
-      .then(({ data }) => {
-        if (!data) return;
-        const names = Array.from(new Set(data.map((row) => row.owner))).filter(
-          Boolean
-        );
-        setExistingNames(names);
-      });
-  }, []);
-
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (input.trim()) setName(input.trim());
-  }
+  const setProfile = useProfileStore((s) => s.setProfile);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-5 py-10">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-6">
-          <h1 className="font-heading text-3xl text-bubble-700">AppGym</h1>
-          <p className="text-bubble-400 font-heading mt-1">
-            Hora de entrenar, quien eres?
+    <div className="min-h-screen flex items-center justify-center px-5 py-10 star-pattern">
+      <div className="w-full max-w-md pop-in">
+        <div className="text-center mb-8">
+          <p className="text-xs font-heading uppercase tracking-widest text-meadow-600 mb-1">
+            Bienvenida al gimnasio
+          </p>
+          <h1 className="font-heading text-4xl game-title">CariñinesGym</h1>
+          <p className="text-wood-600 font-heading text-lg mt-3">
+            Que carinin eres?
           </p>
         </div>
 
         {!isSupabaseConfigured && (
-          <div className="kawaii-card p-4 mb-4 text-sm text-pinky-500 bg-pinky-50/60">
-            Todavia no conectaste Supabase. Copia <code>env.example</code> a{" "}
-            <code>.env.local</code>, pon tus claves y reinicia el servidor.
+          <div className="cozy-card p-4 mb-5 text-sm text-wood-700 bg-wood-50/80">
+            Conecta Supabase en <code>.env.local</code> para guardar entrenos en la nube.
           </div>
         )}
 
-        <div className="kawaii-card p-6">
-          {existingNames.length > 0 && (
-            <div className="mb-5">
-              <p className="text-xs font-heading text-bubble-500 mb-2">
-                Ya usaron esta app
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {existingNames.map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setName(n)}
-                    className="chip bg-bubble-50 text-bubble-600 border border-bubble-200 px-4 py-2"
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <div className="h-px bg-bubble-100 my-4" />
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <div>
-              <label className="text-xs font-heading text-bubble-500">
-                Tu nombre
-              </label>
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="ej: Lulu"
-                autoFocus
-                className="mt-1 w-full rounded-2xl border border-bubble-200 px-4 py-2.5 outline-none focus:border-bubble-400 bg-white"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              className="btn-kawaii mt-2 py-3 font-semibold disabled:opacity-60"
-            >
-              Empezar
-            </button>
-          </form>
+        <div className="flex flex-col gap-4">
+          {(Object.keys(CARININES) as CarinineId[]).map((id) => {
+            const c = CARININES[id];
+            const isKnifey = id === "Knifey";
+            return (
+              <button
+                key={id}
+                onClick={() => setProfile(id)}
+                className={`cozy-card p-5 flex items-center gap-4 text-left w-full active:scale-[0.98] transition ${
+                  isKnifey ? "knifey-card" : "forky-card"
+                }`}
+              >
+                <CarinineAvatar id={id} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-heading text-xl text-gray-800">{c.label}</p>
+                  <p className={`text-sm font-heading ${isKnifey ? "text-psychic-600" : "text-meadow-600"}`}>
+                    {c.subtitle}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 leading-snug">{c.description}</p>
+                  {isKnifey && (
+                    <span className="chip inline-block mt-2 bg-psychic-100 text-psychic-700 border-psychic-200">
+                      Fase Mewtwo incluida
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
-        <p className="text-center text-xs text-bubble-300 mt-6">
-          Sin contraseñas ni registro, solo para ti y tu gente.
+        <p className="text-center text-xs text-gray-400 mt-8">
+          Sin contrasenas. Cada carinin tiene sus propios planes y evolucion.
         </p>
       </div>
     </div>

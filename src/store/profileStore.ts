@@ -1,38 +1,43 @@
 import { create } from "zustand";
+import type { CarinineId } from "../types/profile";
+import { isCarinineId } from "../types/profile";
 
-const STORAGE_KEY = "appgym_profile_name";
+const STORAGE_KEY = "carininesgym_profile";
 
 interface ProfileState {
-  name: string | null;
-  setName: (name: string) => void;
+  name: CarinineId | null;
+  setProfile: (id: CarinineId) => void;
   clear: () => void;
 }
 
-function readStoredName(): string | null {
+function readStoredProfile(): CarinineId | null {
   try {
-    return localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem("appgym_profile_name");
+    if (isCarinineId(raw)) return raw;
+    if (raw?.toLowerCase() === "knifey") return "Knifey";
+    if (raw?.toLowerCase() === "forky") return "Forky";
+    return null;
   } catch {
     return null;
   }
 }
 
 export const useProfileStore = create<ProfileState>((set) => ({
-  name: readStoredName(),
+  name: readStoredProfile(),
 
-  setName: (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
+  setProfile: (id: CarinineId) => {
     try {
-      localStorage.setItem(STORAGE_KEY, trimmed);
+      localStorage.setItem(STORAGE_KEY, id);
     } catch {
-      // localStorage no disponible, seguimos solo con el estado en memoria
+      // ignore
     }
-    set({ name: trimmed });
+    set({ name: id });
   },
 
   clear: () => {
     try {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem("appgym_profile_name");
     } catch {
       // ignore
     }

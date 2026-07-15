@@ -8,6 +8,7 @@ import PlanDetailPage from "./pages/PlanDetailPage";
 import ExerciseLibraryPage from "./pages/ExerciseLibraryPage";
 import WorkoutSessionPage from "./pages/WorkoutSessionPage";
 import HistoryPage from "./pages/HistoryPage";
+import ProgressPage from "./pages/ProgressPage";
 import ProfilePage from "./pages/ProfilePage";
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/planes" element={<PlansPage />} />
         <Route path="/planes/:planId" element={<PlanDetailPage />} />
         <Route path="/ejercicios" element={<ExerciseLibraryPage />} />
+        <Route path="/progreso" element={<ProgressPage />} />
         <Route path="/historial" element={<HistoryPage />} />
         <Route path="/perfil" element={<ProfilePage />} />
       </Route>

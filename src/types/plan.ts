@@ -33,10 +33,13 @@ export interface SetLog {
   id: string;
   session_id: string;
   plan_exercise_id: string;
+  exercise_id?: string;
+  exercise_name?: string;
   set_index: number;
   reps_done: number | null;
   weight_kg: number | null;
   completed: boolean;
+  created_at?: string;
 }
 
 export interface WorkoutSession {

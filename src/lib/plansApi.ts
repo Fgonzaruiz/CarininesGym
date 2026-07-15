@@ -85,6 +85,8 @@ export async function fetchPlans(owner: string): Promise<Plan[]> {
 }
 
 export async function seedDefaultPlanIfNeeded(owner: string): Promise<void> {
+  if (owner !== "Knifey") return;
+
   const { count, error: countError } = await supabase
     .from("plans")
     .select("id", { count: "exact", head: true })

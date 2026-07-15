@@ -1,87 +1,152 @@
 @import "tailwindcss";
 
 @theme {
-  --font-heading: "Baloo 2", "Quicksand", sans-serif;
-  --font-body: "Quicksand", sans-serif;
+  --font-heading: "Fredoka", "Nunito", sans-serif;
+  --font-body: "Nunito", sans-serif;
 
-  --color-bubble-50: #f5f3ff;
-  --color-bubble-100: #ede9fe;
-  --color-bubble-200: #ddd6fe;
-  --color-bubble-300: #c4b5fd;
-  --color-bubble-400: #a78bfa;
-  --color-bubble-500: #8b5cf6;
-  --color-bubble-600: #7c3aed;
-  --color-bubble-700: #6d28d9;
+  /* Stardew meadow greens */
+  --color-meadow-50: #f0fdf4;
+  --color-meadow-100: #dcfce7;
+  --color-meadow-200: #bbf7d0;
+  --color-meadow-300: #86efac;
+  --color-meadow-400: #4ade80;
+  --color-meadow-500: #22c55e;
+  --color-meadow-600: #16a34a;
+  --color-meadow-700: #15803d;
 
-  --color-sky-glow-50: #eff6ff;
-  --color-sky-glow-100: #dbeafe;
-  --color-sky-glow-200: #bfdbfe;
-  --color-sky-glow-300: #93c5fd;
-  --color-sky-glow-400: #60a5fa;
-  --color-sky-glow-500: #3b82f6;
+  /* Wood / warm farm tones */
+  --color-wood-50: #fffbeb;
+  --color-wood-100: #fef3c7;
+  --color-wood-200: #fde68a;
+  --color-wood-300: #fcd34d;
+  --color-wood-400: #fbbf24;
+  --color-wood-500: #f59e0b;
+  --color-wood-600: #d97706;
+  --color-wood-700: #b45309;
 
-  --color-pinky-100: #fce7f3;
-  --color-pinky-200: #fbcfe8;
-  --color-pinky-300: #f9a8d4;
-  --color-pinky-400: #f472b6;
-  --color-pinky-500: #ec4899;
+  /* Pokemon psychic / Knifey accent */
+  --color-psychic-50: #f5f3ff;
+  --color-psychic-100: #ede9fe;
+  --color-psychic-200: #ddd6fe;
+  --color-psychic-300: #c4b5fd;
+  --color-psychic-400: #a78bfa;
+  --color-psychic-500: #8b5cf6;
+  --color-psychic-600: #7c3aed;
+  --color-psychic-700: #6d28d9;
+
+  /* Animal Crossing sky */
+  --color-sky-50: #f0f9ff;
+  --color-sky-100: #e0f2fe;
+  --color-sky-200: #bae6fd;
+  --color-sky-300: #7dd3fc;
+  --color-sky-400: #38bdf8;
+  --color-sky-500: #0ea5e9;
+
+  /* Soft pink accent */
+  --color-blossom-100: #fce7f3;
+  --color-blossom-200: #fbcfe8;
+  --color-blossom-400: #f472b6;
+  --color-blossom-500: #ec4899;
+
+  /* Legacy aliases used in components */
+  --color-bubble-50: var(--color-psychic-50);
+  --color-bubble-100: var(--color-psychic-100);
+  --color-bubble-200: var(--color-psychic-200);
+  --color-bubble-300: var(--color-psychic-300);
+  --color-bubble-400: var(--color-psychic-400);
+  --color-bubble-500: var(--color-psychic-500);
+  --color-bubble-600: var(--color-psychic-600);
+  --color-bubble-700: var(--color-psychic-700);
+  --color-sky-glow-50: var(--color-sky-50);
+  --color-sky-glow-100: var(--color-sky-100);
+  --color-sky-glow-200: var(--color-sky-200);
+  --color-sky-glow-300: var(--color-sky-300);
+  --color-sky-glow-400: var(--color-sky-400);
+  --color-sky-glow-500: var(--color-sky-500);
+  --color-pinky-100: var(--color-blossom-100);
+  --color-pinky-200: var(--color-blossom-200);
+  --color-pinky-400: var(--color-blossom-400);
+  --color-pinky-500: var(--color-blossom-500);
 }
 
 html,
 body {
-  background: linear-gradient(160deg, #eff6ff 0%, #f5f3ff 45%, #fdf2ff 100%);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(187, 247, 208, 0.45) 0%, transparent 42%),
+    radial-gradient(circle at 90% 0%, rgba(196, 181, 253, 0.35) 0%, transparent 38%),
+    radial-gradient(circle at 50% 100%, rgba(254, 243, 199, 0.5) 0%, transparent 45%),
+    linear-gradient(165deg, #fffbeb 0%, #f0fdf4 35%, #f5f3ff 70%, #e0f2fe 100%);
   min-height: 100vh;
   font-family: var(--font-body);
-  color: #4c1d95;
+  color: #374151;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
 
-* {
-  -webkit-text-size-adjust: 100%;
-}
-
-h1,
-h2,
-h3,
-h4,
-.font-heading {
+h1, h2, h3, h4, .font-heading {
   font-family: var(--font-heading);
 }
 
 ::selection {
-  background: var(--color-bubble-200);
+  background: var(--color-meadow-200);
 }
 
-/* Scrollbar cute */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-bubble-300);
+  background: var(--color-meadow-300);
   border-radius: 999px;
 }
 
-.kawaii-card {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(196, 181, 253, 0.5);
-  border-radius: 1.5rem;
-  box-shadow: 0 8px 24px -8px rgba(139, 92, 246, 0.25);
+/* Cozy game card - Stardew wood frame + AC softness */
+.kawaii-card, .cozy-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 251, 235, 0.88) 100%);
+  backdrop-filter: blur(8px);
+  border: 3px solid var(--color-wood-200);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 4px 0 var(--color-wood-300),
+    0 12px 28px -8px rgba(180, 83, 9, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-.btn-kawaii {
-  background: linear-gradient(120deg, var(--color-sky-glow-400), var(--color-bubble-500));
+.knifey-card {
+  border-color: var(--color-psychic-300);
+  box-shadow:
+    0 4px 0 var(--color-psychic-400),
+    0 12px 28px -8px rgba(124, 58, 237, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.forky-card {
+  border-color: var(--color-meadow-300);
+  box-shadow:
+    0 4px 0 var(--color-meadow-400),
+    0 12px 28px -8px rgba(22, 163, 74, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.btn-kawaii, .game-btn {
+  background: linear-gradient(180deg, var(--color-meadow-400) 0%, var(--color-meadow-600) 100%);
   color: white;
   font-family: var(--font-heading);
   border-radius: 999px;
-  box-shadow: 0 10px 20px -8px rgba(139, 92, 246, 0.55);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: 2px solid var(--color-meadow-700);
+  box-shadow: 0 4px 0 var(--color-meadow-700), 0 8px 16px -4px rgba(22, 101, 52, 0.35);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
 }
-.btn-kawaii:active {
-  transform: scale(0.96);
-  box-shadow: 0 4px 10px -4px rgba(139, 92, 246, 0.5);
+.btn-kawaii:active, .game-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 var(--color-meadow-700);
+}
+
+.btn-psychic {
+  background: linear-gradient(180deg, var(--color-psychic-400) 0%, var(--color-psychic-600) 100%);
+  border-color: var(--color-psychic-700);
+  box-shadow: 0 4px 0 var(--color-psychic-700), 0 8px 16px -4px rgba(109, 40, 217, 0.35);
+}
+.btn-psychic:active {
+  box-shadow: 0 2px 0 var(--color-psychic-700);
 }
 
 .chip {
@@ -90,18 +155,43 @@ h4,
   font-size: 0.75rem;
   padding: 0.3rem 0.75rem;
   white-space: nowrap;
+  border: 1.5px solid var(--color-wood-200);
+}
+
+.game-title {
+  background: linear-gradient(135deg, var(--color-psychic-600), var(--color-meadow-600));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.star-pattern {
+  background-image: radial-gradient(circle, rgba(251, 191, 36, 0.35) 1px, transparent 1px);
+  background-size: 18px 18px;
 }
 
 @keyframes pop-in {
-  0% {
-    opacity: 0;
-    transform: scale(0.9) translateY(6px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+  0% { opacity: 0; transform: scale(0.92) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
 }
-.pop-in {
-  animation: pop-in 0.25s ease-out;
+.pop-in { animation: pop-in 0.28s ease-out; }
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+.pulse-soft { animation: pulse-soft 1.2s ease-in-out infinite; }
+
+.progress-bar-game {
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--color-wood-100);
+  border: 2px solid var(--color-wood-200);
+  overflow: hidden;
+}
+.progress-bar-game > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-meadow-400), var(--color-psychic-400));
+  border-radius: 999px;
+  transition: width 0.35s ease;
 }

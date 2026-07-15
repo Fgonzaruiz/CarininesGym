@@ -1,6 +1,5 @@
-// Plan semilla que se crea automaticamente la primera vez que alguien entra.
-// Ideado para entrenar piernas/abdomen/gemelos mientras el codo esta tocado,
-// asi que evitamos ejercicios que carguen muneca/codo (nada de plancha, flexiones, curls pesados...).
+// Plan semilla exclusivo de Knifey: Fase Mewtwo mejorada.
+// Piernas, abdomen y gemelos sin cargar el codo.
 
 export interface SeedExercise {
   exercise_id: string;
@@ -18,53 +17,82 @@ export interface SeedDay {
 export const FASE_MEWTWO_PLAN = {
   name: "Fase Mewtwo",
   description:
-    "Como el codo esta tocado toca evolucionar por otro lado, asi que nos centramos en hacer crecer esas piernotas nivel legendario. Cuatro dias: cinta, abdomen, gemelos y piernas en general. Poquito a poco, sin forzar el codito, pero dandolo todo abajo. Yaaaas queen, vamos a evolucionar.",
+    "Rutina legendaria para evolucionar esas piernotas mientras el codo descansa. Cuatro dias completos: cardio activacion, core psiquico, gemelos de cristal y piernas imperiales. Registra reps, peso y descansos en cada serie para ver tu evolucion.",
   days: [
     {
-      name: "Cardio Core Queen",
+      name: "Dia 1 - Cardio y activacion",
       exercises: [
         {
           exercise_id: "3666",
           sets: 1,
           reps: "25-30 min",
           rest_seconds: 0,
-          notes: "Ritmo comodo, sube la inclinacion poco a poco. Nada de codo, solo piernas reinas",
+          notes: "Cinta inclinada, ritmo comodo. Sube inclinacion poco a poco",
         },
         {
-          exercise_id: "1377",
-          sets: 1,
-          reps: "30 seg x pierna",
-          rest_seconds: 15,
-          notes: "Estiramiento de cierre, para bajar del cardio como una diva",
-        },
-      ],
-    },
-    {
-      name: "Abs de Diosa",
-      exercises: [
-        { exercise_id: "0274", sets: 3, reps: "20", rest_seconds: 45 },
-        { exercise_id: "0872", sets: 3, reps: "15", rest_seconds: 45 },
-        {
-          exercise_id: "0620",
+          exercise_id: "3561",
           sets: 3,
           reps: "15",
           rest_seconds: 45,
-          notes: "Abdomen bajo, controla el movimiento reina",
+          notes: "Calentamiento de gluteos antes del cardio intenso",
         },
-        { exercise_id: "2429", sets: 3, reps: "20", rest_seconds: 45 },
+        {
+          exercise_id: "0274",
+          sets: 2,
+          reps: "15",
+          rest_seconds: 30,
+          notes: "Core suave post-cardio",
+        },
+        {
+          exercise_id: "1377",
+          sets: 2,
+          reps: "30 seg",
+          rest_seconds: 15,
+          notes: "Estiramiento de gemelos, cada pierna",
+        },
       ],
     },
     {
-      name: "Gemelos de Cristal",
+      name: "Dia 2 - Core psiquico",
+      exercises: [
+        { exercise_id: "0274", sets: 4, reps: "20", rest_seconds: 45 },
+        { exercise_id: "0872", sets: 4, reps: "15", rest_seconds: 45 },
+        {
+          exercise_id: "0620",
+          sets: 3,
+          reps: "12",
+          rest_seconds: 50,
+          notes: "Abdomen bajo, control total del movimiento",
+        },
+        { exercise_id: "2429", sets: 3, reps: "18", rest_seconds: 45 },
+        { exercise_id: "0262", sets: 3, reps: "20", rest_seconds: 40, notes: "Cada lado" },
+        {
+          exercise_id: "0873",
+          sets: 3,
+          reps: "15",
+          rest_seconds: 50,
+          notes: "En polea si hay, si no sustituye por reverse crunch",
+        },
+      ],
+    },
+    {
+      name: "Dia 3 - Gemelos legendarios",
       exercises: [
         { exercise_id: "0594", sets: 4, reps: "20", rest_seconds: 45 },
-        { exercise_id: "1373", sets: 3, reps: "25", rest_seconds: 30 },
-        { exercise_id: "0284", sets: 3, reps: "20", rest_seconds: 30 },
+        { exercise_id: "1373", sets: 4, reps: "25", rest_seconds: 35 },
+        { exercise_id: "0284", sets: 3, reps: "20", rest_seconds: 35 },
         { exercise_id: "0605", sets: 3, reps: "15", rest_seconds: 45 },
+        {
+          exercise_id: "0582",
+          sets: 3,
+          reps: "15",
+          rest_seconds: 60,
+          notes: "Bonus femoral, suave con el codo",
+        },
       ],
     },
     {
-      name: "Piernotas Imperiales",
+      name: "Dia 4 - Piernas imperiales",
       exercises: [
         { exercise_id: "0585", sets: 4, reps: "15", rest_seconds: 60 },
         { exercise_id: "0586", sets: 4, reps: "15", rest_seconds: 60 },
@@ -73,9 +101,23 @@ export const FASE_MEWTWO_PLAN = {
           sets: 4,
           reps: "12",
           rest_seconds: 90,
-          notes: "Peso comodo, sin prisa. Piernotas nivel Mewtwo",
+          notes: "Prensa 45, peso comodo. Piernotas nivel Mewtwo",
         },
-        { exercise_id: "3561", sets: 3, reps: "20", rest_seconds: 45 },
+        { exercise_id: "3561", sets: 4, reps: "20", rest_seconds: 45 },
+        {
+          exercise_id: "3523",
+          sets: 3,
+          reps: "15",
+          rest_seconds: 50,
+          notes: "Glute bridge en banco, aprieta arriba 2 seg",
+        },
+        {
+          exercise_id: "1489",
+          sets: 3,
+          reps: "12",
+          rest_seconds: 60,
+          notes: "Sissy squat controlado, apoya las manos solo si hace falta",
+        },
       ],
     },
   ] satisfies SeedDay[],

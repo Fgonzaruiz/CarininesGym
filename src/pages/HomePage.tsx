@@ -1,29 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Play, Dumbbell, ListChecks, Flame } from "lucide-react";
+import { Play, Dumbbell, ListChecks, Flame, TrendingUp } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
-import { fetchHistory } from "../lib/sessionsApi";
+import { CARININES } from "../types/profile";
+import { fetchHistory, fetchStats } from "../lib/sessionsApi";
 import LoadingScreen from "../components/LoadingScreen";
 import type { WorkoutSession } from "../types/plan";
 
-const GREETINGS = [
-  "Yaaaas queen, hora de entrenar",
-  "Vamos reina, dalo todo hoy",
-  "Hoy toca brillar",
-  "Slay total en 3, 2, 1...",
-];
+const GREETINGS: Record<string, string[]> = {
+  Knifey: [
+    "Hora de evolucionar, Knifey",
+    "Fase Mewtwo te espera",
+    "Piernotas legendarias incoming",
+  ],
+  Forky: [
+    "Buen dia en la granja fitness, Forky",
+    "A cosechar gains",
+    "Tu turno de entrenar",
+  ],
+};
 
 export default function HomePage() {
   const name = useProfileStore((s) => s.name);
+  const profile = name ? CARININES[name] : null;
   const { plans, loading, fetch } = usePlansStore();
   const [history, setHistory] = useState<WorkoutSession[]>([]);
-  const [greeting] = useState(GREETINGS[Math.floor(Math.random() * GREETINGS.length)]);
+  const [stats, setStats] = useState<{ thisWeek: number; total: number } | null>(null);
+  const [greeting] = useState(
+    name ? GREETINGS[name][Math.floor(Math.random() * GREETINGS[name].length)] : ""
+  );
 
   useEffect(() => {
     if (name) {
       fetch(name);
       fetchHistory(name, 60).then(setHistory);
+      fetchStats(name).then(setStats);
     }
   }, [name, fetch]);
 
@@ -37,63 +49,78 @@ export default function HomePage() {
     return mainPlan.days[completedForPlan % mainPlan.days.length];
   }, [mainPlan, history]);
 
-  const thisWeekCount = useMemo(() => {
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    startOfWeek.setHours(0, 0, 0, 0);
-    return history.filter(
-      (h) => h.completed_at && new Date(h.started_at) >= startOfWeek
-    ).length;
-  }, [history]);
-
   if (loading && plans.length === 0) return <LoadingScreen />;
+
+  const isKnifey = name === "Knifey";
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="font-heading text-2xl text-bubble-700">Hola {name}</h1>
-        <p className="text-sm text-bubble-400">{greeting}</p>
+      <div className={`cozy-card p-5 ${isKnifey ? "knifey-card" : "forky-card"}`}>
+        <p className="text-xs font-heading uppercase tracking-widest text-gray-500">
+          {profile?.subtitle}
+        </p>
+        <h1 className="font-heading text-2xl text-gray-800 mt-1">
+          Hola, {profile?.label}
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">{greeting}</p>
       </div>
 
-      <div className="kawaii-card p-3 flex items-center gap-3">
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-glow-400 to-bubble-500 flex items-center justify-center text-white shrink-0">
-          <Flame size={20} />
+      {stats && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="cozy-card p-3 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-wood-300 to-wood-500 flex items-center justify-center text-white shrink-0">
+              <Flame size={18} />
+            </div>
+            <div>
+              <p className="font-heading text-gray-800">{stats.thisWeek} esta semana</p>
+              <p className="text-[11px] text-gray-500">{stats.total} entrenos totales</p>
+            </div>
+          </div>
+          <Link to="/progreso" className="cozy-card p-3 flex items-center gap-3 active:scale-[0.98]">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-psychic-300 to-psychic-500 flex items-center justify-center text-white shrink-0">
+              <TrendingUp size={18} />
+            </div>
+            <div>
+              <p className="font-heading text-gray-800">Evolucion</p>
+              <p className="text-[11px] text-gray-500">Ver progreso</p>
+            </div>
+          </Link>
         </div>
-        <div>
-          <p className="font-heading text-bubble-700">{thisWeekCount} entrenos esta semana</p>
-          <p className="text-xs text-bubble-400">sigue así, imparable</p>
-        </div>
-      </div>
+      )}
 
       {mainPlan && nextDay ? (
-        <div className="kawaii-card p-5 bg-gradient-to-br from-sky-glow-50 to-bubble-50">
-          <p className="text-xs font-heading text-bubble-400 mb-1">Tu próximo día · {mainPlan.name}</p>
-          <div className="mb-4">
-            <p className="font-heading text-lg text-bubble-700">{nextDay.name}</p>
-            <p className="text-xs text-bubble-400">{nextDay.exercises.length} ejercicios</p>
-          </div>
+        <div className={`cozy-card p-5 ${isKnifey ? "knifey-card" : ""}`}>
+          <p className="text-xs font-heading text-gray-500 mb-1">
+            Proximo dia · {mainPlan.name}
+          </p>
+          <p className="font-heading text-lg text-gray-800">{nextDay.name}</p>
+          <p className="text-xs text-gray-500 mb-4">{nextDay.exercises.length} ejercicios</p>
           <Link
             to={`/entrenar/${mainPlan.id}/${nextDay.id}`}
-            className="btn-kawaii w-full py-3 font-semibold flex items-center justify-center gap-2"
+            className={`w-full py-3 font-semibold flex items-center justify-center gap-2 rounded-full text-white ${isKnifey ? "btn-psychic game-btn" : "game-btn"}`}
           >
             <Play size={18} /> Empezar entreno
           </Link>
         </div>
       ) : (
-        <div className="kawaii-card p-6 text-center">
-          <p className="text-bubble-500 font-heading">Crea tu primer plan para empezar</p>
+        <div className="cozy-card p-6 text-center">
+          <p className="font-heading text-gray-600">
+            {isKnifey ? "Tu Fase Mewtwo se creara al conectar Supabase" : "Crea tu primer plan"}
+          </p>
+          <Link to="/planes" className="game-btn inline-block mt-3 px-6 py-2 text-sm">
+            Ir a planes
+          </Link>
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <Link to="/planes" className="kawaii-card p-4 flex flex-col items-center gap-1.5 text-center">
-          <ListChecks className="text-bubble-500" size={22} />
-          <span className="font-heading text-sm text-bubble-600">Mis planes</span>
+        <Link to="/planes" className="cozy-card p-4 flex flex-col items-center gap-1.5 text-center">
+          <ListChecks className="text-meadow-600" size={22} />
+          <span className="font-heading text-sm text-gray-700">Mis planes</span>
         </Link>
-        <Link to="/ejercicios" className="kawaii-card p-4 flex flex-col items-center gap-1.5 text-center">
-          <Dumbbell className="text-bubble-500" size={22} />
-          <span className="font-heading text-sm text-bubble-600">Ejercicios</span>
+        <Link to="/ejercicios" className="cozy-card p-4 flex flex-col items-center gap-1.5 text-center">
+          <Dumbbell className="text-psychic-600" size={22} />
+          <span className="font-heading text-sm text-gray-700">Ejercicios</span>
         </Link>
       </div>
     </div>

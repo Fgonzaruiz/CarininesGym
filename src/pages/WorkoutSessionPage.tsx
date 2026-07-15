@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Check, Repeat, CheckCircle2, X } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { Check, Repeat, CheckCircle2, X, Plus, TrendingUp } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
 import { useExercises } from "../hooks/useExercises";
@@ -10,6 +10,7 @@ import * as plansApi from "../lib/plansApi";
 import type { PlanExercise } from "../types/plan";
 import LoadingScreen from "../components/LoadingScreen";
 import ExercisePickerModal from "../components/ExercisePickerModal";
+import RestTimer from "../components/RestTimer";
 
 interface SetState {
   completed: boolean;
@@ -19,10 +20,10 @@ interface SetState {
 }
 
 const HYPE_MESSAGES = [
-  "Lo lograste, reina",
-  "Yaaaas queen, entreno completado",
-  "Esas piernotas ya son leyenda",
-  "Slay total, nivel diosa alcanzado",
+  "Entreno completado, nivel legendario",
+  "Evolucion conseguida, carinin",
+  "Esas piernotas ya son Mewtwo tier",
+  "Slay total en el gimnasio de la granja",
 ];
 
 export default function WorkoutSessionPage() {
@@ -35,26 +36,21 @@ export default function WorkoutSessionPage() {
   const plan = plans.find((p) => p.id === planId);
   const day = plan?.days.find((d) => d.id === dayId);
 
-  useEffect(() => {
-    if (name) fetch(name);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name]);
-
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sets, setSets] = useState<Record<string, SetState[]>>({});
   const [substituting, setSubstituting] = useState<PlanExercise | null>(null);
   const [finished, setFinished] = useState(false);
-  const [hypeMessage] = useState(
-    HYPE_MESSAGES[Math.floor(Math.random() * HYPE_MESSAGES.length)]
-  );
+  const [activeRest, setActiveRest] = useState<{ peId: string; seconds: number } | null>(null);
+  const [hypeMessage] = useState(HYPE_MESSAGES[Math.floor(Math.random() * HYPE_MESSAGES.length)]);
+
+  useEffect(() => {
+    if (name) fetch(name);
+  }, [name, fetch]);
 
   useEffect(() => {
     if (!name || !plan || !day || sessionId) return;
-    sessionsApi.startSession(name, plan.id, day.id, day.name).then((s) => {
-      setSessionId(s.id);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, plan, day]);
+    sessionsApi.startSession(name, plan.id, day.id, day.name).then((s) => setSessionId(s.id));
+  }, [name, plan, day, sessionId]);
 
   useEffect(() => {
     if (!day) return;
@@ -73,43 +69,54 @@ export default function WorkoutSessionPage() {
     });
   }, [day]);
 
-  const exerciseMap = useMemo(() => {
-    const map = new Map(exercises.map((e) => [e.id, e]));
-    return map;
-  }, [exercises]);
+  const exerciseMap = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
 
-  if (!name || exLoading || !plan) return <LoadingScreen label="Preparando tu entreno..." />;
-  if (!day) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-bubble-500">No encontré ese día</p>
-      </div>
-    );
-  }
+  const persistSet = useCallback(
+    async (
+      peId: string,
+      idx: number,
+      exercise_id: string,
+      exercise_name: string,
+      state: SetState
+    ) => {
+      if (!sessionId) return;
+      const log = await sessionsApi.upsertSetLog({
+        session_id: sessionId,
+        plan_exercise_id: peId,
+        exercise_id,
+        exercise_name,
+        set_index: idx,
+        reps_done: state.reps ? Number(state.reps) : null,
+        weight_kg: state.weight ? Number(state.weight) : null,
+        completed: state.completed,
+        existingId: state.logId,
+      });
+      setSets((prev) => ({
+        ...prev,
+        [peId]: prev[peId].map((s, i) => (i === idx ? { ...s, logId: log.id } : s)),
+      }));
+    },
+    [sessionId]
+  );
 
-  async function toggleSet(peId: string, idx: number, exercise_id: string, exercise_name: string) {
-    if (!sessionId) return;
+  async function toggleSet(
+    peId: string,
+    idx: number,
+    exercise_id: string,
+    exercise_name: string,
+    restSeconds: number
+  ) {
     const current = sets[peId][idx];
     const completed = !current.completed;
+    const next = { ...current, completed };
     setSets((prev) => ({
       ...prev,
-      [peId]: prev[peId].map((s, i) => (i === idx ? { ...s, completed } : s)),
+      [peId]: prev[peId].map((s, i) => (i === idx ? next : s)),
     }));
-    const log = await sessionsApi.upsertSetLog({
-      session_id: sessionId,
-      plan_exercise_id: peId,
-      exercise_id,
-      exercise_name,
-      set_index: idx,
-      reps_done: current.reps ? Number(current.reps) : null,
-      weight_kg: current.weight ? Number(current.weight) : null,
-      completed,
-      existingId: current.logId,
-    });
-    setSets((prev) => ({
-      ...prev,
-      [peId]: prev[peId].map((s, i) => (i === idx ? { ...s, logId: log.id } : s)),
-    }));
+    await persistSet(peId, idx, exercise_id, exercise_name, next);
+    if (completed && restSeconds > 0) {
+      setActiveRest({ peId, seconds: restSeconds });
+    }
   }
 
   function updateField(peId: string, idx: number, field: "reps" | "weight", value: string) {
@@ -119,21 +126,48 @@ export default function WorkoutSessionPage() {
     }));
   }
 
+  async function saveFieldOnBlur(
+    peId: string,
+    idx: number,
+    exercise_id: string,
+    exercise_name: string
+  ) {
+    const state = sets[peId]?.[idx];
+    if (!state) return;
+    await persistSet(peId, idx, exercise_id, exercise_name, state);
+  }
+
+  function addSet(peId: string) {
+    setSets((prev) => ({
+      ...prev,
+      [peId]: [...(prev[peId] ?? []), { completed: false, reps: "", weight: "" }],
+    }));
+  }
+
   async function handleFinish() {
     if (sessionId) await sessionsApi.completeSession(sessionId);
     setFinished(true);
   }
 
   async function handleSubstitute(newExerciseId: string) {
-    if (!substituting) return;
+    if (!substituting || !name) return;
     await plansApi.substituteExercise(
       substituting.id,
       substituting.exercise_id,
       newExerciseId,
       substituting.original_exercise_id
     );
-    await refresh(name!);
+    await refresh(name);
     setSubstituting(null);
+  }
+
+  if (!name || exLoading || !plan) return <LoadingScreen label="Preparando entreno..." />;
+  if (!day) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-gray-600">No encontre ese dia</p>
+      </div>
+    );
   }
 
   const substituteSuggestions = substituting
@@ -143,24 +177,29 @@ export default function WorkoutSessionPage() {
       })()
     : [];
 
-  const totalSets = day.exercises.reduce((acc, pe) => acc + pe.sets, 0);
-  const doneSets = day.exercises.reduce(
-    (acc, pe) => acc + (sets[pe.id]?.filter((s) => s.completed).length ?? 0),
+  const totalSets = Object.values(sets).reduce((acc, arr) => acc + arr.length, 0);
+  const doneSets = Object.values(sets).reduce(
+    (acc, arr) => acc + arr.filter((s) => s.completed).length,
     0
   );
 
   if (finished) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center gap-4 px-6">
-        <CheckCircle2 size={64} className="text-bubble-500" />
-        <h1 className="font-heading text-2xl text-bubble-700">{hypeMessage}</h1>
-        <p className="text-bubble-400">Entreno de "{day.name}" guardado en tu historial</p>
-        <button
-          onClick={() => navigate(`/planes/${plan.id}`)}
-          className="btn-kawaii px-6 py-3 font-semibold mt-2"
-        >
-          Volver al plan
-        </button>
+      <div className="min-h-screen star-pattern flex flex-col items-center justify-center text-center gap-4 px-6">
+        <CheckCircle2 size={64} className="text-meadow-500" />
+        <h1 className="font-heading text-2xl text-gray-800">{hypeMessage}</h1>
+        <p className="text-gray-500">"{day.name}" guardado. Tu evolucion ya cuenta.</p>
+        <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
+          <Link to="/progreso" className="game-btn py-3 font-semibold flex items-center justify-center gap-2">
+            <TrendingUp size={18} /> Ver evolucion
+          </Link>
+          <button
+            onClick={() => navigate(`/planes/${plan.id}`)}
+            className="py-3 rounded-full border-2 border-wood-200 text-wood-700 font-heading"
+          >
+            Volver al plan
+          </button>
+        </div>
       </div>
     );
   }
@@ -169,24 +208,19 @@ export default function WorkoutSessionPage() {
     <div className="max-w-3xl mx-auto px-4 pt-4 pb-10 flex flex-col gap-4 min-h-screen">
       <button
         onClick={() => navigate(`/planes/${plan.id}`)}
-        className="flex items-center gap-1 text-sm text-bubble-400 font-heading self-start"
+        className="flex items-center gap-1 text-sm text-gray-500 font-heading self-start"
       >
         <X size={16} /> Salir
       </button>
 
-      <div className="kawaii-card p-4 sticky top-4 z-20">
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <p className="font-heading text-lg text-bubble-700">{day.name}</p>
-            <div className="h-2 rounded-full bg-bubble-100 mt-1 overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-sky-glow-400 to-bubble-500 transition-all"
-                style={{ width: `${totalSets ? (doneSets / totalSets) * 100 : 0}%` }}
-              />
-            </div>
+      <div className="cozy-card p-4 sticky top-4 z-20">
+        <p className="font-heading text-lg text-gray-800">{day.name}</p>
+        <div className="flex items-center gap-2 mt-2">
+          <div className="progress-bar-game flex-1">
+            <div style={{ width: `${totalSets ? (doneSets / totalSets) * 100 : 0}%` }} />
           </div>
-          <span className="text-xs font-heading text-bubble-500 shrink-0">
-            {doneSets}/{totalSets}
+          <span className="text-xs font-heading text-meadow-600 shrink-0">
+            {doneSets}/{totalSets} series
           </span>
         </div>
       </div>
@@ -195,68 +229,99 @@ export default function WorkoutSessionPage() {
         const ex = exerciseMap.get(pe.exercise_id);
         if (!ex) return null;
         const exSets = sets[pe.id] ?? [];
+        const showRest = activeRest?.peId === pe.id;
+
         return (
-          <div key={pe.id} className="kawaii-card p-4">
+          <div key={pe.id} className="cozy-card p-4">
             <div className="flex items-center gap-3 mb-3">
               <img
                 src={`${import.meta.env.BASE_URL}${ex.image ?? ""}`}
                 alt={ex.name}
                 loading="lazy"
-                className="w-14 h-14 rounded-2xl object-cover bg-bubble-50"
+                className="w-16 h-16 rounded-xl object-cover bg-meadow-50 border-2 border-wood-100"
               />
               <div className="flex-1 min-w-0">
-                <p className="font-heading text-bubble-700 capitalize truncate">{ex.name}</p>
-                <p className="text-xs text-bubble-400">
-                  {pe.sets} x {pe.reps} · descanso {pe.rest_seconds}s
+                <p className="font-heading text-gray-800 capitalize truncate">{ex.name}</p>
+                <p className="text-xs text-gray-500">
+                  Objetivo: {pe.sets} x {pe.reps} · descanso {pe.rest_seconds}s
                 </p>
-                {pe.notes && <p className="text-[11px] text-pinky-500">{pe.notes}</p>}
+                {pe.notes && <p className="text-[11px] text-psychic-600 mt-0.5">{pe.notes}</p>}
               </div>
               <button
                 onClick={() => setSubstituting(pe)}
-                className="p-2 rounded-full bg-sky-glow-50 text-sky-glow-500 shrink-0"
-                aria-label="Me duele, cambiar ejercicio"
-                title="Me duele, sustituir"
+                className="p-2 rounded-xl bg-sky-50 border border-sky-200 text-sky-600 shrink-0"
+                title="Sustituir ejercicio"
               >
                 <Repeat size={16} />
               </button>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               {exSets.map((s, idx) => (
-                <div key={idx} className="flex items-center gap-2 bg-bubble-50/70 rounded-2xl p-2">
+                <div
+                  key={idx}
+                  className={`flex items-center gap-2 rounded-xl p-2 border-2 ${
+                    s.completed ? "bg-meadow-50 border-meadow-200" : "bg-white border-wood-100"
+                  }`}
+                >
                   <button
-                    onClick={() => toggleSet(pe.id, idx, pe.exercise_id, ex.name)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition ${
+                    onClick={() => toggleSet(pe.id, idx, pe.exercise_id, ex.name, pe.rest_seconds)}
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition border-2 ${
                       s.completed
-                        ? "bg-bubble-500 text-white"
-                        : "bg-white border-2 border-bubble-200 text-transparent"
+                        ? "bg-meadow-500 border-meadow-600 text-white"
+                        : "bg-wood-50 border-wood-200 text-transparent"
                     }`}
                   >
                     <Check size={16} />
                   </button>
-                  <span className="text-xs text-bubble-400 w-14 shrink-0">Serie {idx + 1}</span>
-                  <input
-                    value={s.reps}
-                    onChange={(e) => updateField(pe.id, idx, "reps", e.target.value)}
-                    placeholder="reps"
-                    inputMode="numeric"
-                    className="w-16 rounded-xl border border-bubble-200 px-2 py-1.5 text-sm text-center outline-none focus:border-bubble-400 bg-white"
-                  />
-                  <input
-                    value={s.weight}
-                    onChange={(e) => updateField(pe.id, idx, "weight", e.target.value)}
-                    placeholder="kg"
-                    inputMode="decimal"
-                    className="w-16 rounded-xl border border-bubble-200 px-2 py-1.5 text-sm text-center outline-none focus:border-bubble-400 bg-white"
-                  />
+                  <span className="text-xs font-heading text-gray-500 w-12 shrink-0">S{idx + 1}</span>
+                  <div className="flex-1 flex gap-1.5">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-gray-400 block">Reps</label>
+                      <input
+                        value={s.reps}
+                        onChange={(e) => updateField(pe.id, idx, "reps", e.target.value)}
+                        onBlur={() => saveFieldOnBlur(pe.id, idx, pe.exercise_id, ex.name)}
+                        placeholder={pe.reps}
+                        inputMode="numeric"
+                        className="w-full rounded-lg border border-wood-200 px-2 py-1.5 text-sm text-center outline-none focus:border-meadow-400 bg-white"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] text-gray-400 block">Kg</label>
+                      <input
+                        value={s.weight}
+                        onChange={(e) => updateField(pe.id, idx, "weight", e.target.value)}
+                        onBlur={() => saveFieldOnBlur(pe.id, idx, pe.exercise_id, ex.name)}
+                        placeholder="0"
+                        inputMode="decimal"
+                        className="w-full rounded-lg border border-wood-200 px-2 py-1.5 text-sm text-center outline-none focus:border-meadow-400 bg-white"
+                      />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
+
+            <button
+              onClick={() => addSet(pe.id)}
+              className="mt-2 flex items-center justify-center gap-1 w-full py-2 rounded-xl border-2 border-dashed border-wood-200 text-wood-600 text-xs font-heading"
+            >
+              <Plus size={14} /> Anadir serie extra
+            </button>
+
+            {showRest && activeRest && (
+              <RestTimer
+                seconds={activeRest.seconds}
+                autoStart
+                onComplete={() => setActiveRest(null)}
+              />
+            )}
           </div>
         );
       })}
 
-      <button onClick={handleFinish} className="btn-kawaii py-4 font-semibold text-lg mb-4">
+      <button onClick={handleFinish} className="game-btn py-4 font-semibold text-lg mb-4">
         Terminar entreno
       </button>
 
@@ -265,7 +330,7 @@ export default function WorkoutSessionPage() {
         onClose={() => setSubstituting(null)}
         exercises={exercises}
         onPick={(ex) => handleSubstitute(ex.id)}
-        title="Me duele, cambiar por..."
+        title="Sustituir por..."
         suggested={substituteSuggestions}
       />
     </div>

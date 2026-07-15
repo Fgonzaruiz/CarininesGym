@@ -9,8 +9,8 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 if (!isSupabaseConfigured) {
   // eslint-disable-next-line no-console
-  console.warn(
-    "[AppGym] Faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. Crea un archivo .env.local (mira env.example) para conectar con Supabase."
+    console.warn(
+    "[CariñinesGym] Faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. Crea un archivo .env.local para conectar con Supabase."
   );
 }
 
