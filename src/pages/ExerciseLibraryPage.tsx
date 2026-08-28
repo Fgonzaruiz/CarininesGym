@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, ShieldCheck } from "lucide-react";
 import { useExercises } from "../hooks/useExercises";
+import { useProfileStore } from "../store/profileStore";
 import { BODY_PARTS, bodyPartLabel, searchExercises } from "../lib/exercises";
+import { filterSafeExercises, unsafeEquipmentHint } from "../lib/injuries";
 import ExerciseCard from "../components/ExerciseCard";
 import ExerciseDetailModal from "../components/ExerciseDetailModal";
 import LoadingScreen from "../components/LoadingScreen";
@@ -9,14 +11,21 @@ import type { Exercise } from "../types/exercise";
 
 export default function ExerciseLibraryPage() {
   const { exercises, loading } = useExercises();
+  const injuries = useProfileStore((s) => s.injuries);
   const [query, setQuery] = useState("");
   const [bodyPart, setBodyPart] = useState("");
   const [selected, setSelected] = useState<Exercise | null>(null);
   const [visibleCount, setVisibleCount] = useState(40);
+  const [onlySafe, setOnlySafe] = useState(false);
+
+  const safePool = useMemo(
+    () => (onlySafe ? filterSafeExercises(exercises, injuries) : exercises),
+    [exercises, injuries, onlySafe]
+  );
 
   const results = useMemo(
-    () => searchExercises(exercises, query, { bodyPart: bodyPart || undefined }),
-    [exercises, query, bodyPart]
+    () => searchExercises(safePool, query, { bodyPart: bodyPart || undefined }),
+    [safePool, query, bodyPart]
   );
 
   if (loading) return <LoadingScreen label="Cargando el catálogo de ejercicios..." />;
@@ -39,6 +48,22 @@ export default function ExerciseLibraryPage() {
           className="w-full rounded-full border border-bubble-200 pl-10 pr-4 py-2.5 text-sm outline-none focus:border-bubble-400 bg-white"
         />
       </div>
+
+      {injuries.length > 0 && (
+        <button
+          onClick={() => setOnlySafe((v) => !v)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-full border-2 font-heading text-xs transition ${
+            onlySafe
+              ? "bg-meadow-500 text-white border-meadow-500"
+              : "bg-white text-meadow-600 border-meadow-200"
+          }`}
+        >
+          <ShieldCheck size={15} />
+          {onlySafe
+            ? "Mostrando solo seguros para tu " + unsafeEquipmentHint(injuries)
+            : "Solo seguros para tu " + unsafeEquipmentHint(injuries)}
+        </button>
+      )}
 
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4">
         <button
@@ -91,6 +116,8 @@ export default function ExerciseLibraryPage() {
         exercise={selected}
         open={!!selected}
         onClose={() => setSelected(null)}
+        exercises={exercises}
+        injuries={injuries}
       />
     </div>
   );

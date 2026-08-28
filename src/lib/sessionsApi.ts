@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { SetLog, WorkoutSession } from "../types/plan";
+import type { SetLog, WorkoutSession, SessionType } from "../types/plan";
 
 export interface SetLogRow extends SetLog {
   exercise_id: string;
@@ -28,11 +28,62 @@ export async function startSession(
   owner: string,
   planId: string,
   planDayId: string,
-  dayName: string
+  dayName: string,
+  sessionType: SessionType = "fuerza"
 ): Promise<WorkoutSession> {
   const { data, error } = await supabase
     .from("workout_sessions")
-    .insert({ owner, plan_id: planId, plan_day_id: planDayId, day_name: dayName })
+    .insert({
+      owner,
+      plan_id: planId,
+      plan_day_id: planDayId,
+      day_name: dayName,
+      session_type: sessionType,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSession(
+  sessionId: string,
+  input: Partial<{
+    session_type: SessionType;
+    duration_minutes: number | null;
+    notes: string | null;
+  }>
+): Promise<void> {
+  const { error } = await supabase
+    .from("workout_sessions")
+    .update(input)
+    .eq("id", sessionId);
+  if (error) throw error;
+}
+
+/** Registra un entreno libre (sin plan): tabata, hybrid, cardio... o lo que sea. */
+export async function quickLogSession(
+  owner: string,
+  input: {
+    session_type: SessionType;
+    duration_minutes: number | null;
+    notes: string | null;
+  }
+): Promise<WorkoutSession> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .insert({
+      owner,
+      plan_id: null,
+      plan_day_id: null,
+      day_name: "Día libre",
+      started_at: now,
+      completed_at: now,
+      session_type: input.session_type,
+      duration_minutes: input.duration_minutes,
+      notes: input.notes,
+    })
     .select()
     .single();
   if (error) throw error;
@@ -203,9 +254,74 @@ export async function clearAllProgress(owner: string): Promise<void> {
   if (error) throw error;
 }
 
+/** Ejercicios distintos (con series completadas) por sesión terminada en el periodo. */
+export async function fetchExerciseIdsBySessionInRange(
+  owner: string,
+  period: MusclePeriod
+): Promise<Map<string, string[]>> {
+  const { from, to } = musclePeriodRange(period);
+
+  const { data: sessions, error: sErr } = await supabase
+    .from("workout_sessions")
+    .select("id")
+    .eq("owner", owner)
+    .not("completed_at", "is", null)
+    .gte("completed_at", from.toISOString())
+    .lt("completed_at", to.toISOString());
+  if (sErr) throw sErr;
+
+  const map = new Map<string, string[]>();
+  const sessionIds = (sessions ?? []).map((s) => s.id);
+  if (sessionIds.length === 0) return map;
+
+  const { data: logs, error: lErr } = await supabase
+    .from("workout_set_logs")
+    .select("session_id, exercise_id")
+    .in("session_id", sessionIds)
+    .eq("completed", true);
+  if (lErr) throw lErr;
+
+  for (const log of logs ?? []) {
+    const list = map.get(log.session_id) ?? [];
+    if (!list.includes(log.exercise_id)) list.push(log.exercise_id);
+    map.set(log.session_id, list);
+  }
+  return map;
+}
+
 export interface LastExerciseLog {
   weight_kg: number | null;
   reps_done: number | null;
+}
+
+/** Periodos que puede mostrar el mapa muscular. */
+export type MusclePeriod = "week" | "lastWeek" | "month";
+
+export const MUSCLE_PERIODS: { id: MusclePeriod; label: string }[] = [
+  { id: "week", label: "Esta semana" },
+  { id: "lastWeek", label: "Semana pasada" },
+  { id: "month", label: "Este mes" },
+];
+
+export function musclePeriodLabel(period: MusclePeriod): string {
+  return (
+    MUSCLE_PERIODS.find((p) => p.id === period)?.label.toLowerCase() ?? ""
+  );
+}
+
+function musclePeriodRange(period: MusclePeriod): { from: Date; to: Date } {
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+
+  if (period === "week") return { from: weekStart, to: now };
+  if (period === "lastWeek") {
+    const from = new Date(weekStart);
+    from.setDate(from.getDate() - 7);
+    return { from, to: weekStart };
+  }
+  return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
 }
 
 /** Ultimo peso/reps registrados por ejercicio (para sugerencias en entreno). */

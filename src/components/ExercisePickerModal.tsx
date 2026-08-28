@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, ShieldCheck } from "lucide-react";
 import type { Exercise } from "../types/exercise";
+import type { InjuryId } from "../lib/injuries";
 import { BODY_PARTS, bodyPartLabel, searchExercises } from "../lib/exercises";
+import { filterSafeExercises, unsafeEquipmentHint } from "../lib/injuries";
 import Modal from "./Modal";
 import ExerciseCard from "./ExerciseCard";
 
@@ -12,6 +14,7 @@ export default function ExercisePickerModal({
   onPick,
   title = "Elige un ejercicio",
   suggested,
+  injuries,
 }: {
   open: boolean;
   onClose: () => void;
@@ -19,30 +22,51 @@ export default function ExercisePickerModal({
   onPick: (exercise: Exercise) => void;
   title?: string;
   suggested?: Exercise[];
+  /** Lesiones activas: oculta ejercicios que las cargan */
+  injuries?: InjuryId[];
 }) {
   const [query, setQuery] = useState("");
   const [bodyPart, setBodyPart] = useState("");
 
+  const safePool = useMemo(
+    () => filterSafeExercises(exercises, injuries ?? []),
+    [exercises, injuries]
+  );
+
   const results = useMemo(
-    () => searchExercises(exercises, query, { bodyPart: bodyPart || undefined }).slice(0, 60),
-    [exercises, query, bodyPart]
+    () => searchExercises(safePool, query, { bodyPart: bodyPart || undefined }).slice(0, 60),
+    [safePool, query, bodyPart]
+  );
+
+  const safeSuggested = useMemo(
+    () => (injuries && injuries.length ? filterSafeExercises(suggested ?? [], injuries) : suggested),
+    [suggested, injuries]
   );
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
       <div className="flex flex-col gap-3">
-        {suggested && suggested.length > 0 && !query && !bodyPart && (
+        {safeSuggested && safeSuggested.length > 0 && !query && !bodyPart && (
           <div>
             <p className="font-heading text-xs text-pinky-500 mb-2">
-              Gemelos ideales para sustituir
+              {injuries && injuries.length
+                ? `Alternativas seguras para tu ${unsafeEquipmentHint(injuries)}`
+                : "Gemelos ideales para sustituir"}
             </p>
             <div className="flex flex-col gap-2 mb-3">
-              {suggested.slice(0, 5).map((ex) => (
+              {safeSuggested.slice(0, 5).map((ex) => (
                 <ExerciseCard key={ex.id} exercise={ex} onClick={() => onPick(ex)} />
               ))}
             </div>
             <div className="h-px bg-bubble-100 my-1" />
           </div>
+        )}
+
+        {injuries && injuries.length > 0 && (
+          <p className="flex items-center gap-1.5 text-[11px] font-heading text-meadow-600 bg-meadow-50 border border-meadow-200 rounded-xl px-3 py-2">
+            <ShieldCheck size={14} /> Ocultando ejercicios que cargan tu{" "}
+            {unsafeEquipmentHint(injuries)}
+          </p>
         )}
 
         <div className="relative">

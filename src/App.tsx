@@ -4,6 +4,7 @@ import AppLayout from "./components/AppLayout";
 import ChooseProfilePage from "./pages/ChooseProfilePage";
 import HomePage from "./pages/HomePage";
 import PlansPage from "./pages/PlansPage";
+import PlanGeneratorPage from "./pages/PlanGeneratorPage";
 import PlanDetailPage from "./pages/PlanDetailPage";
 import ExerciseLibraryPage from "./pages/ExerciseLibraryPage";
 import WorkoutSessionPage from "./pages/WorkoutSessionPage";
@@ -27,6 +28,7 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/planes" element={<PlansPage />} />
+        <Route path="/planes/generar" element={<PlanGeneratorPage />} />
         <Route path="/planes/:planId" element={<PlanDetailPage />} />
         <Route path="/ejercicios" element={<ExerciseLibraryPage />} />
         <Route path="/progreso" element={<ProgressPage />} />

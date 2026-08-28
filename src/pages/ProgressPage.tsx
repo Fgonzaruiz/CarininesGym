@@ -1,21 +1,35 @@
-import { useEffect, useState } from "react";
-import { TrendingUp, Trophy, Calendar, Dumbbell, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { TrendingUp, Trophy, Calendar, Dumbbell, Trash2, Activity } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { CARININES, CARININE_VOICE, isCarinineId } from "../types/profile";
 import {
   fetchEvolution,
   fetchStats,
   clearAllProgress,
+  fetchExerciseIdsBySessionInRange,
+  MUSCLE_PERIODS,
+  musclePeriodLabel,
+  type MusclePeriod,
   type ExerciseEvolution,
 } from "../lib/sessionsApi";
+import { useExercises } from "../hooks/useExercises";
+import { muscleKeyForTarget, type MuscleKey } from "../lib/muscleMap";
 import { clearMewtwoProgress } from "../lib/mewtwoProgress";
+import type { Exercise } from "../types/exercise";
 import LoadingScreen from "../components/LoadingScreen";
 import ExerciseProgressChart from "../components/ExerciseProgressChart";
+import MuscleMap, { type MuscleDetailItem } from "../components/MuscleMap";
+import ExerciseDetailModal from "../components/ExerciseDetailModal";
 
 export default function ProgressPage() {
   const name = useProfileStore((s) => s.name);
+  const injuries = useProfileStore((s) => s.injuries);
+  const { exercises } = useExercises();
   const [evolution, setEvolution] = useState<ExerciseEvolution[]>([]);
   const [stats, setStats] = useState<{ thisWeek: number; total: number } | null>(null);
+  const [periodExercises, setPeriodExercises] = useState<Map<string, string[]> | null>(null);
+  const [period, setPeriod] = useState<MusclePeriod>("week");
+  const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -38,6 +52,72 @@ export default function ProgressPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
 
+  useEffect(() => {
+    if (!name) return;
+    fetchExerciseIdsBySessionInRange(name, period)
+      .then(setPeriodExercises)
+      .catch(() => setPeriodExercises(new Map()));
+  }, [name, period]);
+
+  /** Sesiones por grupo muscular en el periodo (un músculo cuenta una vez por sesión). */
+  const muscleCounts = useMemo(() => {
+    if (!periodExercises || exercises.length === 0) return null;
+    const exById = new Map(exercises.map((e) => [e.id, e]));
+    const counts: Record<string, number> = {};
+    for (const exIds of periodExercises.values()) {
+      const muscles = new Set<MuscleKey>();
+      for (const eid of exIds) {
+        const ex = exById.get(eid);
+        if (!ex) continue;
+        const t = muscleKeyForTarget(ex.target);
+        if (t) muscles.add(t);
+        for (const sec of ex.secondary_muscles) {
+          const s = muscleKeyForTarget(sec);
+          if (s) muscles.add(s);
+        }
+      }
+      for (const m of muscles) counts[m] = (counts[m] ?? 0) + 1;
+    }
+    return counts;
+  }, [periodExercises, exercises]);
+
+  /** Ejercicios (con sesiones) que trabajaron cada músculo en el periodo. */
+  const muscleDetail = useMemo(() => {
+    if (!periodExercises || exercises.length === 0) return {};
+    const exById = new Map(exercises.map((e) => [e.id, e]));
+    const byMuscle = new Map<MuscleKey, Map<string, { name: string; sessions: number }>>();
+    for (const exIds of periodExercises.values()) {
+      for (const eid of exIds) {
+        const ex = exById.get(eid);
+        if (!ex) continue;
+        const muscles = new Set<MuscleKey>();
+        const t = muscleKeyForTarget(ex.target);
+        if (t) muscles.add(t);
+        for (const sec of ex.secondary_muscles) {
+          const s = muscleKeyForTarget(sec);
+          if (s) muscles.add(s);
+        }
+        for (const m of muscles) {
+          let map = byMuscle.get(m);
+          if (!map) {
+            map = new Map();
+            byMuscle.set(m, map);
+          }
+          const cur = map.get(eid);
+          if (cur) cur.sessions += 1;
+          else map.set(eid, { name: ex.name, sessions: 1 });
+        }
+      }
+    }
+    const detail: Partial<Record<MuscleKey, MuscleDetailItem[]>> = {};
+    for (const [m, map] of byMuscle) {
+      detail[m] = Array.from(map.entries())
+        .map(([eid, x]) => ({ id: eid, name: x.name, sessions: x.sessions }))
+        .sort((a, b) => b.sessions - a.sessions);
+    }
+    return detail;
+  }, [periodExercises, exercises]);
+
   async function handleClearProgress() {
     if (!name) return;
     if (
@@ -54,6 +134,7 @@ export default function ProgressPage() {
       setEvolution([]);
       setStats({ thisWeek: 0, total: 0 });
       setExpandedId(null);
+      setPeriodExercises(new Map());
     } finally {
       setClearing(false);
     }
@@ -86,6 +167,43 @@ export default function ProgressPage() {
           </button>
         )}
       </div>
+
+      {muscleCounts && (
+        <div className="cozy-card p-4">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <h2 className="font-heading text-sm text-gray-700 flex items-center gap-1.5">
+              <Activity size={16} className="text-meadow-600" /> Mapa muscular
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {MUSCLE_PERIODS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setPeriod(p.id)}
+                className={`chip border shrink-0 transition active:scale-95 ${
+                  period === p.id
+                    ? "bg-meadow-100 text-meadow-800 border-meadow-300"
+                    : "bg-white text-gray-400 border-wood-200"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <MuscleMap
+            counts={muscleCounts}
+            periodLabel="Sesiones"
+            summaryLabel={musclePeriodLabel(period)}
+            muscleDetail={muscleDetail}
+            catalog={exercises}
+            injuries={injuries}
+            onViewExercise={(id) => {
+              const ex = exercises.find((e) => e.id === id);
+              if (ex) setDetailExercise(ex);
+            }}
+          />
+        </div>
+      )}
 
       {stats && (
         <div className="grid grid-cols-2 gap-3">
@@ -182,6 +300,14 @@ export default function ProgressPage() {
           })}
         </div>
       )}
+
+      <ExerciseDetailModal
+        exercise={detailExercise}
+        open={!!detailExercise}
+        onClose={() => setDetailExercise(null)}
+        exercises={exercises}
+        injuries={injuries}
+      />
     </div>
   );
 }

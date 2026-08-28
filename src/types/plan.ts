@@ -42,13 +42,19 @@ export interface SetLog {
   created_at?: string;
 }
 
+export type SessionType = "fuerza" | "tabata" | "hybrid" | "cardio";
+
+export const SESSION_TYPES: SessionType[] = ["fuerza", "tabata", "hybrid", "cardio"];
+
 export interface WorkoutSession {
   id: string;
   owner: string;
-  plan_day_id: string;
-  plan_id: string;
+  plan_day_id: string | null;
+  plan_id: string | null;
   day_name: string;
   started_at: string;
   completed_at: string | null;
   notes: string | null;
+  session_type: SessionType;
+  duration_minutes: number | null;
 }

@@ -16,9 +16,42 @@ en su dispositivo.
   pensado para entrenar piernas mientras el codo está tocado.
 - **Planes de entrenamiento propios**: crea planes, añade días, añade
   ejercicios desde el catálogo completo, edita series/reps/descanso/notas.
+- **Generador de planes mensuales** 🤖: desde Planes → **Generar** le dices
+  cuántos días quieres ir a la semana (2-6), cuántos de ellos de clases
+  (Cardio / Tabata / Hybrid), el enfoque (general, tren superior, tren
+  inferior, core), tu nivel y lo que te duele — y te fabrica el mes entero:
+  4 semanas con días de Empuje/Tirón/Piernas u otros, cada semana con
+  ejercicios distintos, las semanas 3-4 más intensas, y todo lo que cargue
+  tus molestias fuera del plan. Se crea de golpe y queda agrupado por
+  semanas.
 - **Sustituir un ejercicio** si te duele o no te gusta — se guarda
   permanentemente en ese hueco del plan (y puedes restaurar el original
   cuando quieras).
+- **Lesiones → alternativas seguras**: marca en tu perfil si te duele la
+  muñeca, el codo, el hombro, la rodilla, la espalda baja o el cuello, y la
+  app te avisa cuando un ejercicio carga esa zona y te propone alternativas
+  que trabajan lo mismo sin forzarla (máquinas, cables, bandas...). También
+  hay un modo "solo seguros" en el catálogo y las sugerencias de sustitución
+  respetan tus molestias.
+- **Tipos de entreno**: fuerza, tabata, hybrid o cardio — eliges el tipo al
+  entrenar y queda guardado en tu historial con su etiqueta y duración.
+- **Día libre / registro rápido**: si un día haces un tabata, un hybrid o
+  cardio suelto, lo registras en un momento desde Inicio (con timer de
+  Tabata integrado de 20s/10s por ronda) sin tocar tus planes.
+- **Racha de días** en Inicio para no perder el ritmo.
+- **Mapa muscular**: figuras anatómicas frontal y dorsal (tomadas del mapa
+  corporal de [OpenGym](https://github.com/alexpcosta/opengym), convertido de
+  MuscleMap de Melih Colpan, MIT) con **selector hombre/mujer**, que se
+  colorean según los 18 grupos musculares que has trabajado (con leyenda y
+  lista de los que faltan), en la página de Progreso. Tiene selector de
+  periodo (**esta semana / semana pasada / este mes**) y cada músculo es
+  **clicable**: te enseña con qué ejercicios lo has trabajado en ese periodo,
+  o ideas de ejercicios para entrenarlo si no lo has tocado. Al terminar un
+  entreno también te enseña qué músculos has trabajado hoy y cuáles llevas
+  sin tocar esta semana.
+- **Desglose de músculos secundarios** en cada ejercicio: chips con los
+  grupos musculares secundarios que trabaja, para planificar mejor la
+  semana.
 - **Catálogo de +1300 ejercicios** con imagen, gif animado, músculos e
   instrucciones paso a paso en español.
 - **Modo entrenamiento**: marca series, apunta reps/peso, termina el entreno
@@ -73,7 +106,10 @@ pantalla — pero no podrá guardar nada hasta conectarlo.
    [`supabase/schema.sql`](supabase/schema.sql). Esto crea las tablas
    (`plans`, `plan_days`, `plan_exercises`, `workout_sessions`,
    `workout_set_logs`) con políticas abiertas (no hay Auth, así que no se
-   filtra por usuario a nivel de base de datos).
+   filtra por usuario a nivel de base de datos). El script incluye también
+   los `alter table` de migración: si ya tenías la base creada, vuelve a
+   ejecutarlo y añadirá `session_type` y `duration_minutes` a las sesiones
+   sin tocar tus datos.
 3. Ve a **Project Settings → API** y copia:
    - `Project URL` → `VITE_SUPABASE_URL`
    - la clave pública (`anon` / `publishable`) → `VITE_SUPABASE_ANON_KEY`

@@ -1,9 +1,17 @@
 import { useEffect, useState } from "react";
-import { CalendarCheck, CheckCircle2, Clock } from "lucide-react";
+import { CalendarCheck, Clock, Dumbbell, Flame, Zap, HeartPulse } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { fetchHistory } from "../lib/sessionsApi";
-import type { WorkoutSession } from "../types/plan";
+import { SESSION_TYPE_INFO, formatDuration } from "../lib/sessionTypes";
+import type { SessionType, WorkoutSession } from "../types/plan";
 import LoadingScreen from "../components/LoadingScreen";
+
+const TYPE_ICONS: Record<SessionType, typeof Dumbbell> = {
+  fuerza: Dumbbell,
+  tabata: Flame,
+  hybrid: Zap,
+  cardio: HeartPulse,
+};
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -36,26 +44,47 @@ export default function HistoryPage() {
       </div>
 
       <div className="flex flex-col gap-2.5">
-        {sessions.map((s) => (
-          <div key={s.id} className="kawaii-card p-4 flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-bubble-50 flex items-center justify-center shrink-0">
-              {s.completed_at ? (
-                <CheckCircle2 size={20} className="text-bubble-500" />
-              ) : (
-                <Clock size={20} className="text-pinky-400" />
+        {sessions.map((s) => {
+          const type = s.session_type ?? "fuerza";
+          const typeInfo = SESSION_TYPE_INFO[type] ?? SESSION_TYPE_INFO.fuerza;
+          const TypeIcon = TYPE_ICONS[type] ?? Dumbbell;
+          const duration = formatDuration(s.duration_minutes);
+          return (
+            <div key={s.id} className="kawaii-card p-4 flex items-center gap-3">
+              <div
+                className={`w-11 h-11 rounded-2xl ${typeInfo.iconClass} flex items-center justify-center text-white shrink-0`}
+              >
+                {s.completed_at ? (
+                  <TypeIcon size={20} />
+                ) : (
+                  <Clock size={20} className="text-white" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-heading text-bubble-700 truncate">
+                  {s.day_name || "Entreno"}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <span className={`chip ${typeInfo.chipClass}`}>{typeInfo.label}</span>
+                  {duration && (
+                    <span className="chip bg-bubble-50 text-bubble-500">{duration}</span>
+                  )}
+                  {s.notes && (
+                    <span className="text-[10px] text-bubble-400 truncate max-w-full">
+                      {s.notes}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-bubble-400 mt-1">
+                  {formatDate(s.started_at)} · {formatTime(s.started_at)}
+                </p>
+              </div>
+              {!s.completed_at && (
+                <span className="chip bg-pinky-100 text-pinky-500 shrink-0">sin terminar</span>
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-heading text-bubble-700 truncate">{s.day_name || "Entreno"}</p>
-              <p className="text-xs text-bubble-400">
-                {formatDate(s.started_at)} · {formatTime(s.started_at)}
-              </p>
-            </div>
-            {!s.completed_at && (
-              <span className="chip bg-pinky-100 text-pinky-500 shrink-0">sin terminar</span>
-            )}
-          </div>
-        ))}
+          );
+        })}
 
         {sessions.length === 0 && (
           <div className="kawaii-card p-10 text-center">

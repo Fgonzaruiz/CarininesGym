@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Play, Dumbbell, ListChecks, Flame, TrendingUp } from "lucide-react";
+import {
+  Play,
+  Dumbbell,
+  ListChecks,
+  Flame,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
 import { CARININES, CARININE_VOICE, pickRandom } from "../types/profile";
@@ -12,6 +19,7 @@ import {
   getWeekMeta,
 } from "../lib/mewtwoProgress";
 import LoadingScreen from "../components/LoadingScreen";
+import QuickLogModal from "../components/QuickLogModal";
 import type { WorkoutSession } from "../types/plan";
 
 export default function HomePage() {
@@ -20,6 +28,7 @@ export default function HomePage() {
   const { plans, loading, fetch } = usePlansStore();
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [stats, setStats] = useState<{ thisWeek: number; total: number } | null>(null);
+  const [quickLogOpen, setQuickLogOpen] = useState(false);
   const [greeting] = useState(
     name ? pickRandom(CARININE_VOICE[name].greetings) : ""
   );
@@ -31,6 +40,41 @@ export default function HomePage() {
       fetchStats(name).then(setStats);
     }
   }, [name, fetch]);
+
+  function handleQuickLogSaved() {
+    if (!name) return;
+    fetchHistory(name, 60).then(setHistory);
+    fetchStats(name).then(setStats);
+  }
+
+  const streak = useMemo(() => {
+    const dates = new Set<string>();
+    for (const s of history) {
+      if (!s.completed_at) continue;
+      const d = new Date(s.completed_at);
+      dates.add(
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+          d.getDate()
+        ).padStart(2, "0")}`
+      );
+    }
+    const today = new Date();
+    const key = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate()
+      ).padStart(2, "0")}`;
+    let cursor = new Date(today);
+    if (!dates.has(key(cursor))) {
+      cursor.setDate(cursor.getDate() - 1);
+      if (!dates.has(key(cursor))) return 0;
+    }
+    let count = 0;
+    while (dates.has(key(cursor))) {
+      count += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return count;
+  }, [history]);
 
   const mainPlan = plans.find((p) => p.is_default) ?? plans[0];
 
@@ -75,21 +119,30 @@ export default function HomePage() {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="cozy-card p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-wood-300 to-wood-500 flex items-center justify-center text-white shrink-0">
-              <Flame size={18} />
+        <div className="grid grid-cols-3 gap-3">
+          <div className="cozy-card p-3 flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-wood-300 to-wood-500 flex items-center justify-center text-white shrink-0">
+              <Flame size={16} />
             </div>
-            <div>
-              <p className="font-heading text-gray-800">{stats.thisWeek} esta semana</p>
-              <p className="text-[11px] text-gray-500">{stats.total} entrenos totales</p>
+            <div className="min-w-0">
+              <p className="font-heading text-gray-800 truncate">{stats.thisWeek} esta sem.</p>
+              <p className="text-[11px] text-gray-500">{stats.total} totales</p>
             </div>
           </div>
-          <Link to="/progreso" className="cozy-card p-3 flex items-center gap-3 active:scale-[0.98]">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-psychic-300 to-psychic-500 flex items-center justify-center text-white shrink-0">
-              <TrendingUp size={18} />
+          <div className="cozy-card p-3 flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pinky-400 to-pinky-600 flex items-center justify-center text-white shrink-0">
+              <Zap size={16} />
             </div>
-            <div>
+            <div className="min-w-0">
+              <p className="font-heading text-gray-800 truncate">{streak} días de racha</p>
+              <p className="text-[11px] text-gray-500">sin parar</p>
+            </div>
+          </div>
+          <Link to="/progreso" className="cozy-card p-3 flex items-center gap-2.5 active:scale-[0.98]">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-psychic-300 to-psychic-500 flex items-center justify-center text-white shrink-0">
+              <TrendingUp size={16} />
+            </div>
+            <div className="min-w-0">
               <p className="font-heading text-gray-800">Progreso</p>
               <p className="text-[11px] text-gray-500">Ver progreso</p>
             </div>
@@ -136,6 +189,21 @@ export default function HomePage() {
         </div>
       )}
 
+      <button
+        onClick={() => setQuickLogOpen(true)}
+        className={`cozy-card p-4 flex items-center gap-3 text-left active:scale-[0.98] transition ${isKnifey ? "knifey-card" : ""}`}
+      >
+        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-pinky-400 to-pinky-600 flex items-center justify-center text-white shrink-0">
+          <Zap size={20} />
+        </div>
+        <div className="flex-1">
+          <p className="font-heading text-gray-800">Día libre o algo especial</p>
+          <p className="text-[11px] text-gray-500">
+            Registra Tabata, Hybrid o cardio en un momento
+          </p>
+        </div>
+      </button>
+
       <div className="grid grid-cols-2 gap-3">
         <Link to="/planes" className="cozy-card p-4 flex flex-col items-center gap-1.5 text-center">
           <ListChecks className="text-meadow-600" size={22} />
@@ -146,6 +214,12 @@ export default function HomePage() {
           <span className="font-heading text-sm text-gray-700">Ejercicios</span>
         </Link>
       </div>
+
+      <QuickLogModal
+        open={quickLogOpen}
+        onClose={() => setQuickLogOpen(false)}
+        onSaved={handleQuickLogSaved}
+      />
     </div>
   );
 }

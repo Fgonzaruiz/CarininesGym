@@ -78,8 +78,16 @@ create table if not exists public.workout_sessions (
   day_name text not null default '',
   started_at timestamptz not null default now(),
   completed_at timestamptz,
-  notes text
+  notes text,
+  session_type text not null default 'fuerza',
+  duration_minutes int
 );
+
+-- Migracion para bases ya creadas: anade las columnas nuevas si faltan.
+alter table public.workout_sessions
+  add column if not exists session_type text not null default 'fuerza';
+alter table public.workout_sessions
+  add column if not exists duration_minutes int;
 
 alter table public.workout_sessions enable row level security;
 

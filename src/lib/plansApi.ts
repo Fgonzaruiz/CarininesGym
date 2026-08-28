@@ -196,6 +196,57 @@ export async function createPlan(
   return { ...data, days: [] };
 }
 
+/** Crea un plan generado de golpe (plan + días + ejercicios en bloques). */
+export async function createGeneratedPlan(
+  owner: string,
+  input: { name: string; description: string },
+  days: Array<{
+    name: string;
+    exercises: Array<{
+      exercise_id: string;
+      sets: number;
+      reps: string;
+      rest_seconds: number;
+      notes?: string;
+    }>;
+  }>
+): Promise<Plan> {
+  const { data: plan, error: planError } = await supabase
+    .from("plans")
+    .insert({ owner, name: input.name, description: input.description })
+    .select()
+    .single();
+  if (planError) throw planError;
+
+  const dayRows = days.map((d, i) => ({ plan_id: plan.id, day_index: i, name: d.name }));
+  const { data: insertedDays, error: daysError } = await supabase
+    .from("plan_days")
+    .insert(dayRows)
+    .select();
+  if (daysError) throw daysError;
+
+  const dayIdByIndex = new Map<number, string>();
+  for (const d of insertedDays ?? []) dayIdByIndex.set(d.day_index, d.id);
+
+  const exerciseRows = days.flatMap((d, i) =>
+    d.exercises.map((ex, idx) => ({
+      plan_day_id: dayIdByIndex.get(i)!,
+      order_index: idx,
+      exercise_id: ex.exercise_id,
+      sets: ex.sets,
+      reps: ex.reps,
+      rest_seconds: ex.rest_seconds,
+      notes: ex.notes ?? null,
+    }))
+  );
+  if (exerciseRows.length) {
+    const { error: exError } = await supabase.from("plan_exercises").insert(exerciseRows);
+    if (exError) throw exError;
+  }
+
+  return { ...plan, days: [] };
+}
+
 export async function deletePlan(planId: string): Promise<void> {
   const { error } = await supabase.from("plans").delete().eq("id", planId);
   if (error) throw error;

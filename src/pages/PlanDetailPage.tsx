@@ -11,11 +11,17 @@ import {
   ArrowLeft,
   RotateCcw,
   Dumbbell,
+  AlertTriangle,
 } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
 import { useExercises } from "../hooks/useExercises";
-import { getExerciseById, findSimilarExercises } from "../lib/exercises";
+import { getExerciseById } from "../lib/exercises";
+import {
+  findSafeAlternatives,
+  unsafeReasonsFor,
+  unsafeEquipmentHint,
+} from "../lib/injuries";
 import * as api from "../lib/plansApi";
 import type { PlanExercise } from "../types/plan";
 import {
@@ -24,6 +30,11 @@ import {
   getWeekDays,
   getWeekMeta,
 } from "../lib/mewtwoProgress";
+import {
+  isGeneratedPlan,
+  generatedPlanWeeks,
+} from "../lib/planGenerator";
+import { SESSION_TYPE_INFO, sessionTypeFromDayName } from "../lib/sessionTypes";
 import LoadingScreen from "../components/LoadingScreen";
 import Modal from "../components/Modal";
 import ExercisePickerModal from "../components/ExercisePickerModal";
@@ -32,6 +43,7 @@ export default function PlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
   const name = useProfileStore((s) => s.name);
+  const injuries = useProfileStore((s) => s.injuries);
   const { plans, fetch, refresh } = usePlansStore();
   const { exercises, loading: exercisesLoading } = useExercises();
 
@@ -79,6 +91,11 @@ export default function PlanDetailPage() {
       meta: getWeekMeta(week),
       days: getWeekDays(plan, week),
     }));
+  }, [plan]);
+
+  const generatedWeeks = useMemo(() => {
+    if (!plan || !isGeneratedPlan(plan)) return null;
+    return generatedPlanWeeks(plan);
   }, [plan]);
 
   if (!name || exercisesLoading || (plans.length === 0 && !plan)) {
@@ -180,12 +197,15 @@ export default function PlanDetailPage() {
   const substituteSuggestions = substitutingExercise
     ? (() => {
         const current = exerciseMap.get(substitutingExercise.exercise_id);
-        return current ? findSimilarExercises(exercises, current) : [];
+        return current
+          ? findSafeAlternatives(exercises, current, injuries, 10)
+          : [];
       })()
     : [];
 
   function renderDayCard(day: (typeof currentPlan.days)[number], dayIdx: number) {
     const isOpen = openDay === day.id;
+    const dayType = sessionTypeFromDayName(day.name);
     return (
       <div key={day.id} className="kawaii-card overflow-hidden">
         <button
@@ -196,7 +216,14 @@ export default function PlanDetailPage() {
             {dayIdx + 1}
           </span>
           <div className="flex-1">
-            <p className="font-heading text-bubble-700">{day.name}</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <p className="font-heading text-bubble-700">{day.name}</p>
+              {dayType && (
+                <span className={`chip border-transparent ${SESSION_TYPE_INFO[dayType].chipClass}`}>
+                  {SESSION_TYPE_INFO[dayType].label}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-bubble-400">{day.exercises.length} ejercicios</p>
           </div>
           {isOpen ? (
@@ -229,6 +256,11 @@ export default function PlanDetailPage() {
                     <p className="text-xs text-bubble-400">
                       {pe.sets} x {pe.reps} · descanso {pe.rest_seconds}s
                     </p>
+                    {injuries.length > 0 && unsafeReasonsFor(ex, injuries).length > 0 && (
+                      <p className="flex items-center gap-1 text-[10px] font-heading text-pinky-500 mt-0.5">
+                        <AlertTriangle size={10} /> Carga tu {unsafeEquipmentHint(injuries)}
+                      </p>
+                    )}
                     {pe.notes && (
                       <p className="text-[11px] text-pinky-500 mt-0.5">{pe.notes}</p>
                     )}
@@ -351,7 +383,19 @@ export default function PlanDetailPage() {
                 {group.days.map((day, idx) => renderDayCard(day, idx))}
               </div>
             ))
-          : plan.days.map((day, dayIdx) => renderDayCard(day, dayIdx))}
+          : generatedWeeks
+            ? generatedWeeks.map((group) => (
+                <div key={group.week} className="flex flex-col gap-2">
+                  <div className="rounded-2xl px-4 py-3 bg-bubble-50/60">
+                    <p className="font-heading text-bubble-700">Semana {group.week}</p>
+                    <p className="text-xs text-bubble-400 mt-0.5">
+                      {group.days.length} días · las semanas 3-4 suben intensidad
+                    </p>
+                  </div>
+                  {group.days.map((day, idx) => renderDayCard(day, idx))}
+                </div>
+              ))
+            : plan.days.map((day, dayIdx) => renderDayCard(day, dayIdx))}
 
         {!mewtwoWeekGroups && (
           <button
@@ -404,6 +448,7 @@ export default function PlanDetailPage() {
         exercises={exercises}
         onPick={(ex) => pickerForDay && handlePickExercise(pickerForDay, ex.id)}
         title="Añadir ejercicio"
+        injuries={injuries}
       />
 
       <ExercisePickerModal
@@ -413,6 +458,7 @@ export default function PlanDetailPage() {
         onPick={(ex) => handleSubstitute(ex.id)}
         title="Sustituir por..."
         suggested={substituteSuggestions}
+        injuries={injuries}
       />
 
       <EditExerciseModal

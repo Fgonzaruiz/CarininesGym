@@ -69,6 +69,7 @@ export function getCompletedDayIdsInWeek(
     if (
       session.plan_id === plan.id &&
       session.completed_at &&
+      session.plan_day_id &&
       weekDayIds.has(session.plan_day_id) &&
       session.completed_at >= weekStartedAt
     ) {

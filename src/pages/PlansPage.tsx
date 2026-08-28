@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Plus, ChevronRight, Crown, Dumbbell, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus, ChevronRight, Crown, Dumbbell, Trash2, Wand2 } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
 import * as api from "../lib/plansApi";
@@ -8,6 +8,7 @@ import LoadingScreen from "../components/LoadingScreen";
 import Modal from "../components/Modal";
 
 export default function PlansPage() {
+  const navigate = useNavigate();
   const name = useProfileStore((s) => s.name);
   const { plans, loading, fetch, refresh } = usePlansStore();
   const [creating, setCreating] = useState(false);
@@ -55,13 +56,22 @@ export default function PlansPage() {
           <h1 className="font-heading text-2xl text-bubble-700">Tus planes</h1>
           <p className="text-sm text-bubble-400">Crea, edita y sustituye a tu gusto</p>
         </div>
-        <button
-          onClick={() => setCreating(true)}
-          className="btn-kawaii p-3 rounded-full"
-          aria-label="Crear plan"
-        >
-          <Plus size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/planes/generar")}
+            className="btn-kawaii px-4 py-2.5 rounded-full text-sm font-semibold flex items-center gap-1.5"
+            aria-label="Generar plan"
+          >
+            <Wand2 size={16} /> Generar
+          </button>
+          <button
+            onClick={() => setCreating(true)}
+            className="btn-kawaii p-3 rounded-full"
+            aria-label="Crear plan"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">

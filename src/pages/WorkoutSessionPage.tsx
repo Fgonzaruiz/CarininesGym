@@ -1,15 +1,31 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { Check, Repeat, CheckCircle2, X, Plus, TrendingUp, Play } from "lucide-react";
+import {
+  Check,
+  Repeat,
+  CheckCircle2,
+  X,
+  Plus,
+  TrendingUp,
+  Play,
+  AlertTriangle,
+} from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
 import { useExercises } from "../hooks/useExercises";
 import {
-  findSimilarExercises,
   exerciseUsesWeight,
   parseTargetReps,
   bodyPartLabel,
 } from "../lib/exercises";
+import {
+  findSafeAlternatives,
+  unsafeReasonsFor,
+  unsafeEquipmentHint,
+} from "../lib/injuries";
+import { SESSION_TYPE_INFO, sessionTypeFromDayName } from "../lib/sessionTypes";
+import { muscleKeyForTarget, MUSCLE_KEYS, type MuscleKey } from "../lib/muscleMap";
+import MuscleMap, { type MuscleDetailItem } from "../components/MuscleMap";
 import type { Exercise } from "../types/exercise";
 import * as sessionsApi from "../lib/sessionsApi";
 import * as plansApi from "../lib/plansApi";
@@ -19,7 +35,8 @@ import {
   getWeekMeta,
   onMewtwoSessionComplete,
 } from "../lib/mewtwoProgress";
-import type { PlanExercise } from "../types/plan";
+import type { PlanExercise, SessionType } from "../types/plan";
+import { SESSION_TYPES } from "../types/plan";
 import { CARININE_VOICE, pickRandom, isCarinineId } from "../types/profile";
 import LoadingScreen from "../components/LoadingScreen";
 import ExercisePickerModal from "../components/ExercisePickerModal";
@@ -38,6 +55,7 @@ export default function WorkoutSessionPage() {
   const { planId, dayId } = useParams<{ planId: string; dayId: string }>();
   const navigate = useNavigate();
   const name = useProfileStore((s) => s.name);
+  const injuries = useProfileStore((s) => s.injuries);
   const { plans, fetch, refresh } = usePlansStore();
   const { exercises, loading: exLoading } = useExercises();
 
@@ -45,11 +63,17 @@ export default function WorkoutSessionPage() {
   const day = plan?.days.find((d) => d.id === dayId);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionType, setSessionType] = useState<SessionType>("fuerza");
   const [sets, setSets] = useState<Record<string, SetState[]>>({});
   const [substituting, setSubstituting] = useState<PlanExercise | null>(null);
   const [detailExercise, setDetailExercise] = useState<Exercise | null>(null);
   const [lastLogs, setLastLogs] = useState<Map<string, LastExerciseLog>>(new Map());
   const [finished, setFinished] = useState(false);
+  const [finishedCounts, setFinishedCounts] = useState<Record<string, number> | null>(null);
+  const [finishedUntrained, setFinishedUntrained] = useState<MuscleKey[]>([]);
+  const [finishedDetail, setFinishedDetail] = useState<
+    Partial<Record<MuscleKey, MuscleDetailItem[]>>
+  >({});
   const [weekAdvanceMessage, setWeekAdvanceMessage] = useState<string | null>(null);
   const [activeRest, setActiveRest] = useState<{ peId: string; seconds: number } | null>(null);
   const [hypeMessage] = useState(() =>
@@ -72,6 +96,17 @@ export default function WorkoutSessionPage() {
     if (!name || !plan || !day || sessionId) return;
     sessionsApi.startSession(name, plan.id, day.id, day.name).then((s) => setSessionId(s.id));
   }, [name, plan, day, sessionId]);
+
+  useEffect(() => {
+    if (!day || sessionId) return;
+    const t = sessionTypeFromDayName(day.name);
+    if (t && t !== "fuerza") setSessionType(t);
+  }, [day, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    sessionsApi.updateSession(sessionId, { session_type: sessionType }).catch(() => {});
+  }, [sessionId, sessionType]);
 
   useEffect(() => {
     if (!day) return;
@@ -190,6 +225,65 @@ export default function WorkoutSessionPage() {
   async function handleFinish() {
     if (sessionId) await sessionsApi.completeSession(sessionId);
 
+    // Músculos trabajados hoy (de las series completadas) y los que llevas sin tocar esta semana
+    const todayCounts: Record<string, number> = {};
+    const detailMap = new Map<MuscleKey, Map<string, MuscleDetailItem>>();
+    for (const pe of day?.exercises ?? []) {
+      const anyCompleted = (sets[pe.id] ?? []).some((s) => s.completed);
+      if (!anyCompleted) continue;
+      const ex = exerciseMap.get(pe.exercise_id);
+      if (!ex) continue;
+      const ms = new Set<MuscleKey>();
+      const t = muscleKeyForTarget(ex.target);
+      if (t) ms.add(t);
+      for (const sec of ex.secondary_muscles) {
+        const k = muscleKeyForTarget(sec);
+        if (k) ms.add(k);
+      }
+      for (const m of ms) {
+        todayCounts[m] = 1;
+        let map = detailMap.get(m);
+        if (!map) {
+          map = new Map();
+          detailMap.set(m, map);
+        }
+        const cur = map.get(ex.id);
+        if (cur) cur.sessions += 1;
+        else map.set(ex.id, { id: ex.id, name: ex.name, sessions: 1 });
+      }
+    }
+    const detail: Partial<Record<MuscleKey, MuscleDetailItem[]>> = {};
+    for (const [m, map] of detailMap) {
+      detail[m] = Array.from(map.values());
+    }
+    setFinishedCounts(todayCounts);
+    setFinishedDetail(detail);
+
+    if (name) {
+      try {
+        const weekMap = await sessionsApi.fetchExerciseIdsBySessionInRange(name, "week");
+        const exById = new Map(exercises.map((e) => [e.id, e]));
+        const weekCounts: Record<string, number> = {};
+        for (const exIds of weekMap.values()) {
+          const muscles = new Set<MuscleKey>();
+          for (const eid of exIds) {
+            const ex = exById.get(eid);
+            if (!ex) continue;
+            const t = muscleKeyForTarget(ex.target);
+            if (t) muscles.add(t);
+            for (const sec of ex.secondary_muscles) {
+              const k = muscleKeyForTarget(sec);
+              if (k) muscles.add(k);
+            }
+          }
+          for (const m of muscles) weekCounts[m] = (weekCounts[m] ?? 0) + 1;
+        }
+        setFinishedUntrained(MUSCLE_KEYS.filter((k) => !((weekCounts[k] ?? 0) > 0)));
+      } catch {
+        setFinishedUntrained([]);
+      }
+    }
+
     if (name && plan && isMewtwoMonthPlan(plan)) {
       const history = await sessionsApi.fetchHistory(name, 80);
       const beforeWeek = loadMewtwoProgress(name).week;
@@ -232,7 +326,9 @@ export default function WorkoutSessionPage() {
   const substituteSuggestions = substituting
     ? (() => {
         const current = exerciseMap.get(substituting.exercise_id);
-        return current ? findSimilarExercises(exercises, current) : [];
+        return current
+          ? findSafeAlternatives(exercises, current, injuries, 10)
+          : [];
       })()
     : [];
 
@@ -244,16 +340,41 @@ export default function WorkoutSessionPage() {
 
   if (finished) {
     return (
-      <div className="min-h-screen star-pattern flex flex-col items-center justify-center text-center gap-4 px-6">
+      <div className="min-h-screen star-pattern flex flex-col items-center justify-center text-center gap-4 px-6 py-10 overflow-y-auto">
         <CheckCircle2 size={64} className="text-meadow-500" />
         <h1 className="font-heading text-2xl text-gray-800">{hypeMessage}</h1>
-        <p className="text-gray-500">"{day.name}" guardado. {finishNote}</p>
+        <p className="text-gray-500">
+          "{day.name}" · {SESSION_TYPE_INFO[sessionType].label} guardado. {finishNote}
+        </p>
         {weekAdvanceMessage && (
           <p className={`text-sm font-heading px-4 ${name === "Knifey" ? "text-psychic-600" : "text-meadow-600"}`}>
             {weekAdvanceMessage}
           </p>
         )}
-        <div className="flex flex-col gap-2 w-full max-w-xs mt-2">
+
+        {finishedCounts && (
+          <div className="cozy-card p-4 w-full max-w-md">
+            <h2 className="font-heading text-sm text-gray-700 mb-2">
+              Qué has trabajado hoy 💪
+            </h2>
+            <MuscleMap
+              counts={finishedCounts}
+              periodLabel="Sesiones"
+              summaryLabel="hoy"
+              untrainedLabel="sin tocar esta semana"
+              untrained={finishedUntrained}
+              muscleDetail={finishedDetail}
+              catalog={exercises}
+              injuries={injuries}
+              onViewExercise={(id) => {
+                const ex = exercises.find((e) => e.id === id);
+                if (ex) setDetailExercise(ex);
+              }}
+            />
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 w-full max-w-xs mt-1">
           <Link to="/progreso" className="game-btn py-3 font-semibold flex items-center justify-center gap-2">
             <TrendingUp size={18} /> Ver progreso
           </Link>
@@ -264,6 +385,14 @@ export default function WorkoutSessionPage() {
             Volver al plan
           </button>
         </div>
+
+        <ExerciseDetailModal
+          exercise={detailExercise}
+          open={!!detailExercise}
+          onClose={() => setDetailExercise(null)}
+          exercises={exercises}
+          injuries={injuries}
+        />
       </div>
     );
   }
@@ -279,6 +408,21 @@ export default function WorkoutSessionPage() {
 
       <div className="cozy-card p-4 sticky top-4 z-20">
         <p className="font-heading text-lg text-gray-800">{day.name}</p>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {SESSION_TYPES.map((t) => (
+            <button
+              key={t}
+              onClick={() => setSessionType(t)}
+              className={`chip border shrink-0 ${
+                sessionType === t
+                  ? `${SESSION_TYPE_INFO[t].chipClass} border-transparent`
+                  : "bg-white text-gray-400 border-wood-200"
+              }`}
+            >
+              {SESSION_TYPE_INFO[t].label}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2 mt-2">
           <div className="progress-bar-game flex-1">
             <div style={{ width: `${totalSets ? (doneSets / totalSets) * 100 : 0}%` }} />
@@ -329,8 +473,13 @@ export default function WorkoutSessionPage() {
                 )}
               </button>
               <div className="flex-1 min-w-0">
-                <p className="font-heading text-gray-800 capitalize">{ex.name}</p>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-[11px]">
+        <p className="font-heading text-gray-800 capitalize">{ex.name}</p>
+        {injuries.length > 0 && unsafeReasonsFor(ex, injuries).length > 0 && (
+          <p className="flex items-center gap-1 text-[10px] font-heading text-pinky-600 mt-1">
+            <AlertTriangle size={11} /> Carga tu {unsafeEquipmentHint(injuries)} · mejor sustitúyelo
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-[11px]">
                   <p className="text-gray-500">
                     <span className="text-gray-400">Series:</span> {pe.sets} x {pe.reps}
                   </p>
@@ -345,6 +494,12 @@ export default function WorkoutSessionPage() {
                     <span className="text-gray-400">Zona:</span> {bodyPartLabel(ex.body_part)}
                   </p>
                 </div>
+                {ex.secondary_muscles.length > 0 && (
+                  <p className="text-[10px] text-gray-400 capitalize truncate mt-1">
+                    También: {ex.secondary_muscles.slice(0, 4).join(", ")}
+                    {ex.secondary_muscles.length > 4 ? "…" : ""}
+                  </p>
+                )}
                 {pe.notes && <p className="text-[11px] text-psychic-600 mt-1.5">{pe.notes}</p>}
               </div>
               <button
@@ -447,12 +602,15 @@ export default function WorkoutSessionPage() {
         onPick={(ex) => handleSubstitute(ex.id)}
         title="Sustituir por..."
         suggested={substituteSuggestions}
+        injuries={injuries}
       />
 
       <ExerciseDetailModal
         exercise={detailExercise}
         open={!!detailExercise}
         onClose={() => setDetailExercise(null)}
+        exercises={exercises}
+        injuries={injuries}
       />
     </div>
   );

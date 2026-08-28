@@ -1,8 +1,10 @@
+import { HeartPulse } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { CARININES, type CarinineId } from "../types/profile";
+import { INJURIES, getInjury, type InjuryId } from "../lib/injuries";
 
 export default function ProfilePage() {
-  const { name, clear, setProfile } = useProfileStore();
+  const { name, clear, setProfile, injuries, toggleInjury } = useProfileStore();
   const profile = name ? CARININES[name] : null;
 
   function handleSwitch(id: CarinineId) {
@@ -31,6 +33,41 @@ export default function ProfilePage() {
           <p className="text-sm text-gray-500">{profile.description}</p>
         </div>
       )}
+
+      <div className="cozy-card p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <HeartPulse size={16} className="text-pinky-500" />
+          <p className="text-xs font-heading text-gray-500">¿Te duele algo hoy?</p>
+        </div>
+        <p className="text-xs text-gray-400 mb-3">
+          Marca tu molestia y la app te propondrá alternativas que no la carguen
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {INJURIES.map((inj) => {
+            const active = injuries.includes(inj.id);
+            return (
+              <button
+                key={inj.id}
+                onClick={() => toggleInjury(inj.id)}
+                className={`chip border-2 transition ${
+                  active
+                    ? "bg-pinky-500 text-white border-pinky-500"
+                    : "bg-white text-gray-500 border-wood-200"
+                }`}
+              >
+                {inj.question}
+              </button>
+            );
+          })}
+        </div>
+        {injuries.length > 0 && (
+          <div className="mt-3 rounded-xl bg-pinky-50 border border-pinky-200 p-3">
+            <p className="text-xs text-pinky-600 leading-relaxed">
+              {injuries.map((id: InjuryId) => getInjury(id).tip).join(" ")}
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="cozy-card p-5">
         <p className="text-xs font-heading text-gray-500 mb-3">Cambiar carinin</p>
