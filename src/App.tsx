@@ -11,6 +11,7 @@ import WorkoutSessionPage from "./pages/WorkoutSessionPage";
 import HistoryPage from "./pages/HistoryPage";
 import ProgressPage from "./pages/ProgressPage";
 import ProfilePage from "./pages/ProfilePage";
+import NutritionPage from "./pages/NutritionPage";
 
 export default function App() {
   const name = useProfileStore((s) => s.name);
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/progreso" element={<ProgressPage />} />
         <Route path="/historial" element={<HistoryPage />} />
         <Route path="/perfil" element={<ProfilePage />} />
+        <Route path="/nutricion" element={<NutritionPage />} />
       </Route>
       <Route path="/entrenar/:planId/:dayId" element={<WorkoutSessionPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />

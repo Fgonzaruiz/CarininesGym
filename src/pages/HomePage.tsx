@@ -7,6 +7,7 @@ import {
   Flame,
   TrendingUp,
   Zap,
+  Apple,
 } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
@@ -20,6 +21,7 @@ import {
 } from "../lib/mewtwoProgress";
 import LoadingScreen from "../components/LoadingScreen";
 import QuickLogModal from "../components/QuickLogModal";
+import { PROTEIN_GOAL } from "../data/nutrition";
 import type { WorkoutSession } from "../types/plan";
 
 export default function HomePage() {
@@ -203,6 +205,21 @@ export default function HomePage() {
           </p>
         </div>
       </button>
+
+      <Link
+        to="/nutricion"
+        className={`cozy-card p-4 flex items-center gap-3 active:scale-[0.98] transition ${isKnifey ? "knifey-card" : ""}`}
+      >
+        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-meadow-300 to-meadow-600 flex items-center justify-center text-white shrink-0">
+          <Apple size={20} />
+        </div>
+        <div className="flex-1">
+          <p className="font-heading text-gray-800">Tu guía de nutrición</p>
+          <p className="text-[11px] text-gray-500">
+            Regla 80-20 · proteína {PROTEIN_GOAL} · qué evitar
+          </p>
+        </div>
+      </Link>
 
       <div className="grid grid-cols-2 gap-3">
         <Link to="/planes" className="cozy-card p-4 flex flex-col items-center gap-1.5 text-center">
