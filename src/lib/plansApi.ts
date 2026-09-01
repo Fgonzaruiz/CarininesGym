@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
 import { FASE_MEWTWO_FLAT_DAYS, FASE_MEWTWO_PLAN } from "../data/defaultPlan";
 import type { SeedDay } from "../data/defaultPlan";
+import { RUTINA_5_DIAS_PLAN } from "../data/routine5dias";
 import type { Plan, PlanDay, PlanExercise } from "../types/plan";
 
 interface RawPlanRow {
@@ -144,6 +145,25 @@ async function insertMewtwoDays(
       if (exError) throw exError;
     }
   }
+}
+
+/** Crea la rutina de 5 días de Forky si todavía no la tiene. */
+export async function ensureRoutinePlanIfNeeded(owner: string): Promise<void> {
+  if (owner !== "Forky") return;
+
+  const { data: existing, error: existsError } = await supabase
+    .from("plans")
+    .select("id")
+    .eq("owner", owner)
+    .eq("name", RUTINA_5_DIAS_PLAN.name);
+  if (existsError) throw existsError;
+  if (existing && existing.length > 0) return;
+
+  await createGeneratedPlan(
+    owner,
+    { name: RUTINA_5_DIAS_PLAN.name, description: RUTINA_5_DIAS_PLAN.description },
+    RUTINA_5_DIAS_PLAN.days
+  );
 }
 
 /** Añade semanas 2-4 si Knifey ya tenia el plan antiguo de 4 dias. */

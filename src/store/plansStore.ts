@@ -23,6 +23,7 @@ export const usePlansStore = create<PlansState>((set, get) => ({
     try {
       await api.seedDefaultPlanIfNeeded(owner);
       await api.upgradeMewtwoPlanIfNeeded(owner);
+      await api.ensureRoutinePlanIfNeeded(owner);
       const plans = await api.fetchPlans(owner);
       set({ plans, loading: false, loaded: true });
     } catch (err) {
@@ -38,6 +39,7 @@ export const usePlansStore = create<PlansState>((set, get) => ({
     try {
       await api.seedDefaultPlanIfNeeded(owner);
       await api.upgradeMewtwoPlanIfNeeded(owner);
+      await api.ensureRoutinePlanIfNeeded(owner);
       const plans = await api.fetchPlans(owner);
       set({ plans, loading: false, loaded: true });
     } catch (err) {

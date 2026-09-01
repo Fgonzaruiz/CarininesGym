@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Apple, Ban, Droplets, Salad } from "lucide-react";
+import { Ban, Droplets, Salad } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import {
   NUTRITION_SECTIONS,
   PROTEIN_GOAL,
   RULE_80_20,
-  TOP_3_CINTURA,
   type NutritionSection,
 } from "../data/nutrition";
 
@@ -161,9 +160,7 @@ export default function NutritionPage() {
           <div>
             <p className="font-heading text-gray-800">{RULE_80_20.title}</p>
             <p className="text-xs text-gray-500">
-              {isKnifey
-                ? "Plan sostenible para no dejarlo a las 2 semanas"
-                : "Tu plan para reducir cintura sin dejarlo a las 2 semanas"}
+              Un plan sostenible para no dejarlo a las 2 semanas
             </p>
           </div>
         </div>
@@ -175,21 +172,6 @@ export default function NutritionPage() {
           <span>80-90% de la lista</span>
           <span>10-20% flexible</span>
         </div>
-      </div>
-
-      <div className="cozy-card p-5">
-        <div className="flex items-center gap-2 mb-2">
-          <Apple size={16} className="text-pinky-500" />
-          <p className="font-heading text-sm text-gray-700">{TOP_3_CINTURA.title}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {TOP_3_CINTURA.items.map((item) => (
-            <span key={item} className="chip border-2 bg-pinky-50 border-pinky-200 text-pinky-600">
-              {item}
-            </span>
-          ))}
-        </div>
-        <p className="text-[11px] text-gray-400 mt-2">{TOP_3_CINTURA.note}</p>
       </div>
 
       <div className="rounded-2xl border-2 border-dashed border-wood-200 p-4 bg-white/60">

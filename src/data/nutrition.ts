@@ -19,12 +19,6 @@ export const RULE_80_20 = {
   body: "No se trata de prohibir nada al 100%. Un enfoque sostenible es 80-90% alimentos de la lista de incluir, y un 10-20% flexible para gustos puntuales — así no lo dejas a las 2 semanas.",
 };
 
-export const TOP_3_CINTURA = {
-  title: "Lo que más impacto tiene en tu cintura",
-  items: ["Controlar el alcohol", "Evitar azúcares líquidos", "Reducir ultraprocesados"],
-  note: "Más que ser perfecto con todo lo demás.",
-};
-
 export const NUTRITION_SECTIONS: NutritionSection[] = [
   {
     id: "protein",
@@ -153,7 +147,7 @@ export const NUTRITION_SECTIONS: NutritionSection[] = [
     foods: [
       { name: "Cereales de desayuno azucarados" },
       { name: "Pan blanco refinado en exceso", note: "mejor integral, no hace falta eliminarlo del todo" },
-      { name: "Exceso de sal", note: "favorece la retención de líquidos y la cintura se ve más hinchada" },
+      { name: "Exceso de sal", note: "favorece la retención de líquidos y la hinchazón" },
     ],
   },
 ];
