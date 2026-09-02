@@ -26,7 +26,7 @@ create table if not exists public.plans (
 
 alter table public.plans enable row level security;
 
-create policy "Acceso abierto a planes"
+create policy if not exists "Acceso abierto a planes"
   on public.plans for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ create table if not exists public.plan_days (
 
 alter table public.plan_days enable row level security;
 
-create policy "Acceso abierto a dias"
+create policy if not exists "Acceso abierto a dias"
   on public.plan_days for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ create table if not exists public.plan_exercises (
 
 alter table public.plan_exercises enable row level security;
 
-create policy "Acceso abierto a ejercicios de plan"
+create policy if not exists "Acceso abierto a ejercicios de plan"
   on public.plan_exercises for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ alter table public.workout_sessions
 
 alter table public.workout_sessions enable row level security;
 
-create policy "Acceso abierto a sesiones"
+create policy if not exists "Acceso abierto a sesiones"
   on public.workout_sessions for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ create table if not exists public.workout_set_logs (
 
 alter table public.workout_set_logs enable row level security;
 
-create policy "Acceso abierto a registros de series"
+create policy if not exists "Acceso abierto a registros de series"
   on public.workout_set_logs for all using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
