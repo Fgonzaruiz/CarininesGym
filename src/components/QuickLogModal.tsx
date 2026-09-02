@@ -4,6 +4,7 @@ import { useProfileStore } from "../store/profileStore";
 import { SESSION_TYPE_INFO } from "../lib/sessionTypes";
 import { SESSION_TYPES, type SessionType } from "../types/plan";
 import { quickLogSession } from "../lib/sessionsApi";
+import { describeError } from "../lib/errors";
 import Modal from "./Modal";
 import TabataTimer from "./TabataTimer";
 
@@ -34,12 +35,14 @@ export default function QuickLogModal({
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [tabataDone, setTabataDone] = useState(false);
 
   function handleTypeChange(t: SessionType) {
     setType(t);
     setDuration(String(SESSION_TYPE_INFO[t].defaultDurationMinutes));
     setTabataDone(false);
+    setError(null);
   }
 
   function handleTabataComplete(totalSeconds: number) {
@@ -51,6 +54,7 @@ export default function QuickLogModal({
   async function handleSave() {
     if (!name || saving) return;
     setSaving(true);
+    setError(null);
     try {
       const dur = duration.trim() ? Number(duration) : null;
       await quickLogSession(name, {
@@ -60,6 +64,8 @@ export default function QuickLogModal({
       });
       setSaved(true);
       onSaved?.();
+    } catch (err) {
+      setError(describeError(err));
     } finally {
       setSaving(false);
     }
@@ -71,6 +77,7 @@ export default function QuickLogModal({
     setTimeout(() => {
       setSaved(false);
       setTabataDone(false);
+      setError(null);
       setNotes("");
       setType("tabata");
       setDuration(String(SESSION_TYPE_INFO.tabata.defaultDurationMinutes));
@@ -197,6 +204,18 @@ export default function QuickLogModal({
               />
             </div>
           </div>
+
+          {error && (
+            <div className="rounded-2xl bg-pinky-50 border-2 border-pinky-200 p-3">
+              <p className="text-sm font-heading text-pinky-600">
+                No se ha podido guardar el entreno.
+              </p>
+              <p className="text-xs text-gray-500 mt-1 break-words">{error}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Revisa tu conexión y pulsa de nuevo en "Guardar entreno".
+              </p>
+            </div>
+          )}
 
           <button
             onClick={handleSave}

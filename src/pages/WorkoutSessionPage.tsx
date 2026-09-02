@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   Check,
@@ -43,6 +43,7 @@ import ExercisePickerModal from "../components/ExercisePickerModal";
 import ExerciseDetailModal from "../components/ExerciseDetailModal";
 import RestTimer from "../components/RestTimer";
 import type { LastExerciseLog } from "../lib/sessionsApi";
+import { describeError } from "../lib/errors";
 
 interface SetState {
   completed: boolean;
@@ -82,6 +83,10 @@ export default function WorkoutSessionPage() {
   const [finishNote] = useState(() =>
     name && isCarinineId(name) ? CARININE_VOICE[name].finishNote : "Registrado en tu progreso."
   );
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
+  const creatingRef = useRef(false);
 
   useEffect(() => {
     if (name) fetch(name);
@@ -92,10 +97,23 @@ export default function WorkoutSessionPage() {
     sessionsApi.fetchLastLogsByExercise(name).then(setLastLogs).catch(() => {});
   }, [name]);
 
-  useEffect(() => {
-    if (!name || !plan || !day || sessionId) return;
-    sessionsApi.startSession(name, plan.id, day.id, day.name).then((s) => setSessionId(s.id));
+  const createSession = useCallback(async () => {
+    if (!name || !plan || !day || sessionId || creatingRef.current) return;
+    creatingRef.current = true;
+    setSessionError(null);
+    try {
+      const s = await sessionsApi.startSession(name, plan.id, day.id, day.name);
+      setSessionId(s.id);
+    } catch (err) {
+      setSessionError(describeError(err));
+    } finally {
+      creatingRef.current = false;
+    }
   }, [name, plan, day, sessionId]);
+
+  useEffect(() => {
+    if (name && plan && day && !sessionId) void createSession();
+  }, [name, plan, day, sessionId, createSession]);
 
   useEffect(() => {
     if (!day || sessionId) return;
@@ -223,7 +241,52 @@ export default function WorkoutSessionPage() {
   }
 
   async function handleFinish() {
-    if (sessionId) await sessionsApi.completeSession(sessionId);
+    if (finishing) return;
+    setFinishing(true);
+    setFinishError(null);
+
+    let sid = sessionId;
+    try {
+      // Si la sesión no se pudo crear antes (p. ej. sin conexión), se vuelve a
+      // intentar al terminar. Además se re-sincronizan todas las series para
+      // que ningún dato quede sin guardar.
+      if (!sid) {
+        if (!name || !plan || !day) {
+          throw new Error("Faltan datos del plan para guardar el entreno.");
+        }
+        const created = await sessionsApi.startSession(name, plan.id, day.id, day.name);
+        setSessionId(created.id);
+        sid = created.id;
+      }
+
+      for (const [peId, arr] of Object.entries(sets)) {
+        const pe = day?.exercises.find((e) => e.id === peId);
+        if (!pe) continue;
+        const ex = exerciseMap.get(pe.exercise_id);
+        if (!ex) continue;
+        for (let i = 0; i < arr.length; i++) {
+          const s = arr[i];
+          if (!s.reps && !s.weight && !s.completed) continue;
+          await sessionsApi.upsertSetLog({
+            session_id: sid,
+            plan_exercise_id: peId,
+            exercise_id: pe.exercise_id,
+            exercise_name: ex.name,
+            set_index: i,
+            reps_done: s.reps ? Number(s.reps) : null,
+            weight_kg: s.weight ? Number(s.weight) : null,
+            completed: s.completed,
+            existingId: s.logId,
+          });
+        }
+      }
+
+      await sessionsApi.completeSession(sid);
+    } catch (err) {
+      setFinishError(describeError(err));
+      setFinishing(false);
+      return;
+    }
 
     // Músculos trabajados hoy (de las series completadas) y los que llevas sin tocar esta semana
     const todayCounts: Record<string, number> = {};
@@ -285,20 +348,25 @@ export default function WorkoutSessionPage() {
     }
 
     if (name && plan && isMewtwoMonthPlan(plan)) {
-      const history = await sessionsApi.fetchHistory(name, 80);
-      const beforeWeek = loadMewtwoProgress(name).week;
-      const after = onMewtwoSessionComplete(name, plan, history);
-      if (after.week !== beforeWeek) {
-        const meta = getWeekMeta(after.week);
-        const voice = isCarinineId(name) ? CARININE_VOICE[name] : null;
-        setWeekAdvanceMessage(
-          after.week === 1 && beforeWeek === 4
-            ? voice?.monthDone ?? "Mes completado. Nuevo ciclo."
-            : voice?.weekUnlocked(meta.title) ?? `Semana desbloqueada: ${meta.title}`
-        );
+      try {
+        const history = await sessionsApi.fetchHistory(name, 80);
+        const beforeWeek = loadMewtwoProgress(name).week;
+        const after = onMewtwoSessionComplete(name, plan, history);
+        if (after.week !== beforeWeek) {
+          const meta = getWeekMeta(after.week);
+          const voice = isCarinineId(name) ? CARININE_VOICE[name] : null;
+          setWeekAdvanceMessage(
+            after.week === 1 && beforeWeek === 4
+              ? voice?.monthDone ?? "Mes completado. Nuevo ciclo."
+              : voice?.weekUnlocked(meta.title) ?? `Semana desbloqueada: ${meta.title}`
+          );
+        }
+      } catch {
+        // Si falla el avance de semana (p. ej. sin conexión) el entreno ya está guardado.
       }
     }
 
+    setFinishing(false);
     setFinished(true);
   }
 
@@ -432,6 +500,25 @@ export default function WorkoutSessionPage() {
           </span>
         </div>
       </div>
+
+      {sessionError && !sessionId && (
+        <div className="cozy-card p-4 border-2 border-pinky-200">
+          <p className="text-sm font-heading text-pinky-600">
+            No se ha podido registrar este entreno en la nube todavía.
+          </p>
+          <p className="text-xs text-gray-500 mt-1 break-words">{sessionError}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            Comprueba tu conexión. Podrás reintentarlo al terminar; las series que vayas
+            marcando se guardarán igualmente.
+          </p>
+          <button
+            onClick={() => void createSession()}
+            className="btn-kawaii px-4 py-2 text-sm font-semibold mt-3"
+          >
+            Reintentar conexión
+          </button>
+        </div>
+      )}
 
       {day.exercises.map((pe) => {
         const ex = exerciseMap.get(pe.exercise_id);
@@ -591,8 +678,22 @@ export default function WorkoutSessionPage() {
         );
       })}
 
-      <button onClick={handleFinish} className="game-btn py-4 font-semibold text-lg mb-4">
-        Terminar entreno
+      {finishError && (
+        <div className="cozy-card p-4 border-2 border-pinky-200">
+          <p className="text-sm font-heading text-pinky-600">No se ha guardado el entreno.</p>
+          <p className="text-xs text-gray-500 mt-1 break-words">{finishError}</p>
+          <p className="text-xs text-gray-400 mt-1">
+            Revisa tu conexión y pulsa de nuevo en "Terminar entreno": se reintentará
+            guardar la sesión y todas las series.
+          </p>
+        </div>
+      )}
+      <button
+        onClick={handleFinish}
+        disabled={finishing}
+        className="game-btn py-4 font-semibold text-lg mb-4 disabled:opacity-60"
+      >
+        {finishing ? "Guardando..." : "Terminar entreno"}
       </button>
 
       <ExercisePickerModal
