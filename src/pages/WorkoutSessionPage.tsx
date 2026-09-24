@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Play,
   AlertTriangle,
+  Bot,
 } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
@@ -26,6 +27,7 @@ import {
 import { SESSION_TYPE_INFO, sessionTypeFromDayName } from "../lib/sessionTypes";
 import { muscleKeyForTarget, MUSCLE_KEYS, type MuscleKey } from "../lib/muscleMap";
 import MuscleMap, { type MuscleDetailItem } from "../components/MuscleMap";
+import PainAssistantModal from "../components/PainAssistantModal";
 import type { Exercise } from "../types/exercise";
 import * as sessionsApi from "../lib/sessionsApi";
 import * as plansApi from "../lib/plansApi";
@@ -42,8 +44,9 @@ import LoadingScreen from "../components/LoadingScreen";
 import ExercisePickerModal from "../components/ExercisePickerModal";
 import ExerciseDetailModal from "../components/ExerciseDetailModal";
 import RestTimer from "../components/RestTimer";
-import type { LastExerciseLog } from "../lib/sessionsApi";
+import type { LastExerciseLog, RecentPoint } from "../lib/sessionsApi";
 import { describeError } from "../lib/errors";
+import { suggestNext, isStalled, type PR } from "../lib/progression";
 
 interface SetState {
   completed: boolean;
@@ -86,6 +89,15 @@ export default function WorkoutSessionPage() {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [progression, setProgression] = useState<Map<string, RecentPoint[]>>(new Map());
+  const [prs, setPrs] = useState<PR[]>([]);
+  const [missingWarning, setMissingWarning] = useState<null | {
+    missingWeight: number;
+    missingReps: number;
+    emptyExercises: string[];
+  }>(null);
+  const [confirmFinish, setConfirmFinish] = useState(false);
   const creatingRef = useRef(false);
 
   useEffect(() => {
@@ -97,6 +109,15 @@ export default function WorkoutSessionPage() {
     sessionsApi.fetchLastLogsByExercise(name).then(setLastLogs).catch(() => {});
   }, [name]);
 
+  useEffect(() => {
+    if (!name || !day) return;
+    const ids = day.exercises.map((pe) => pe.exercise_id);
+    sessionsApi
+      .fetchRecentProgression(name, ids, 4)
+      .then(setProgression)
+      .catch(() => {});
+  }, [name, day]);
+
   const createSession = useCallback(async () => {
     if (!name || !plan || !day || sessionId || creatingRef.current) return;
     creatingRef.current = true;
@@ -104,6 +125,8 @@ export default function WorkoutSessionPage() {
     try {
       const s = await sessionsApi.startSession(name, plan.id, day.id, day.name);
       setSessionId(s.id);
+      // Limpieza silenciosa de fantasmas antiguos (no toca la sesión en curso).
+      sessionsApi.cleanupGhostSessions(name, s.id).catch(() => {});
     } catch (err) {
       setSessionError(describeError(err));
     } finally {
@@ -240,8 +263,54 @@ export default function WorkoutSessionPage() {
     }));
   }
 
+  function fillWithSuggestion(peId: string, weight: number | null, reps: string) {
+    const repsNum = reps.match(/^(\d+)/)?.[1] ?? "";
+    setSets((prev) => ({
+      ...prev,
+      [peId]: (prev[peId] ?? []).map((s) =>
+        s.completed
+          ? s
+          : { ...s, weight: weight != null ? String(weight) : s.weight, reps: s.reps || repsNum }
+      ),
+    }));
+    setMissingWarning(null);
+  }
+
   async function handleFinish() {
     if (finishing) return;
+
+    // Anti-olvidos: si hay series completadas sin peso/reps en ejercicios con peso, avisa una vez.
+    if (!confirmFinish && day) {
+      let missingWeight = 0;
+      let missingReps = 0;
+      const emptyExercises = new Set<string>();
+      for (const pe of day.exercises) {
+        const ex = exerciseMap.get(pe.exercise_id);
+        if (!ex) continue;
+        const needsWeight = exerciseUsesWeight(pe.reps, ex.equipment);
+        for (const s of sets[pe.id] ?? []) {
+          if (!s.completed) continue;
+          if (needsWeight && !s.weight) {
+            missingWeight += 1;
+            emptyExercises.add(ex.name);
+          }
+          if (!s.reps) {
+            missingReps += 1;
+            emptyExercises.add(ex.name);
+          }
+        }
+      }
+      if (missingWeight > 0 || missingReps > 0) {
+        setMissingWarning({
+          missingWeight,
+          missingReps,
+          emptyExercises: [...emptyExercises].slice(0, 4),
+        });
+        setConfirmFinish(true);
+        return;
+      }
+    }
+    setMissingWarning(null);
     setFinishing(true);
     setFinishError(null);
 
@@ -286,6 +355,49 @@ export default function WorkoutSessionPage() {
       setFinishError(describeError(err));
       setFinishing(false);
       return;
+    }
+
+    // PRs: compara lo de hoy con el historial previo (lastLogs + progression).
+    try {
+      const found: PR[] = [];
+      for (const pe of day?.exercises ?? []) {
+        const ex = exerciseMap.get(pe.exercise_id);
+        if (!ex) continue;
+        const done = (sets[pe.id] ?? []).filter((s) => s.completed);
+        if (done.length === 0) continue;
+        const todayW = Math.max(...done.map((s) => Number(s.weight) || 0));
+        const todayR = Math.max(...done.map((s) => Number(s.reps) || 0));
+        const todayVol = done.reduce(
+          (acc, s) => acc + (Number(s.weight) || 0) * (Number(s.reps) || 0),
+          0
+        );
+        const prev = lastLogs.get(pe.exercise_id);
+        const prevW = prev?.weight_kg ?? 0;
+        const prevR = prev?.reps_done ?? 0;
+        const hist = progression.get(pe.exercise_id) ?? [];
+        const bestW = Math.max(prevW, ...hist.map((h) => h.maxWeight));
+        const bestR = Math.max(prevR, ...hist.map((h) => h.maxReps));
+        if (todayW > bestW && todayW > 0) {
+          found.push({
+            exercise_id: pe.exercise_id,
+            exercise_name: ex.name,
+            kind: "peso",
+            detail: `${todayW} kg (antes ${bestW} kg)`,
+          });
+        } else if (todayR > bestR && todayW >= bestW && todayW > 0) {
+          found.push({
+            exercise_id: pe.exercise_id,
+            exercise_name: ex.name,
+            kind: "reps",
+            detail: `${todayR} reps con ${todayW} kg`,
+          });
+        } else if (todayVol > 0 && bestW > 0 && todayW >= bestW && done.length >= 3) {
+          // Volumen como mención suave solo si iguala peso con buen trabajo.
+        }
+      }
+      setPrs(found.slice(0, 6));
+    } catch {
+      setPrs([]);
     }
 
     // Músculos trabajados hoy (de las series completadas) y los que llevas sin tocar esta semana
@@ -367,6 +479,7 @@ export default function WorkoutSessionPage() {
     }
 
     setFinishing(false);
+    setConfirmFinish(false);
     setFinished(true);
   }
 
@@ -418,6 +531,22 @@ export default function WorkoutSessionPage() {
           <p className={`text-sm font-heading px-4 ${name === "Knifey" ? "text-psychic-600" : "text-meadow-600"}`}>
             {weekAdvanceMessage}
           </p>
+        )}
+
+        {prs.length > 0 && (
+          <div className="cozy-card p-4 w-full max-w-md border-2 border-amber-200">
+            <h2 className="font-heading text-sm text-amber-700 mb-2">
+              Nuevos récords
+            </h2>
+            <div className="flex flex-col gap-1.5 text-left">
+              {prs.map((pr) => (
+                <p key={pr.exercise_id} className="text-xs text-gray-700 capitalize">
+                  <span className="font-heading text-amber-600">PR {pr.kind} · </span>
+                  {pr.exercise_name}: {pr.detail}
+                </p>
+              ))}
+            </div>
+          </div>
         )}
 
         {finishedCounts && (
@@ -475,7 +604,16 @@ export default function WorkoutSessionPage() {
       </button>
 
       <div className="cozy-card p-4 sticky top-4 z-20">
-        <p className="font-heading text-lg text-gray-800">{day.name}</p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-heading text-lg text-gray-800">{day.name}</p>
+          <button
+            onClick={() => setAssistantOpen(true)}
+            className="flex items-center gap-1.5 shrink-0 px-3 py-1.5 rounded-full bg-psychic-50 border border-psychic-200 text-psychic-600 text-xs font-heading hover:bg-psychic-100 active:scale-95 transition"
+            title="Cuéntale al asistente qué te duele y adapta el entreno"
+          >
+            <Bot size={14} /> ¿Te duele algo?
+          </button>
+        </div>
         <div className="flex flex-wrap gap-1.5 mt-2">
           {SESSION_TYPES.map((t) => (
             <button
@@ -527,6 +665,16 @@ export default function WorkoutSessionPage() {
         const showRest = activeRest?.peId === pe.id;
         const usesWeight = exerciseUsesWeight(pe.reps, ex.equipment);
         const last = lastLogs.get(pe.exercise_id);
+        const recent = progression.get(pe.exercise_id) ?? [];
+        const stalled = isStalled(recent);
+        const suggestion = usesWeight
+          ? suggestNext(
+              last?.weight_kg ?? null,
+              last?.reps_done ?? null,
+              pe.reps,
+              ex.body_part
+            )
+          : null;
         const recommendedWeight = usesWeight
           ? last?.weight_kg
             ? `${last.weight_kg} kg`
@@ -588,6 +736,32 @@ export default function WorkoutSessionPage() {
                   </p>
                 )}
                 {pe.notes && <p className="text-[11px] text-psychic-600 mt-1.5">{pe.notes}</p>}
+                {suggestion && last?.weight_kg != null && (
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <p className="text-[11px] text-gray-600">
+                      <span className="text-gray-400">Hoy:</span>{" "}
+                      <span className="font-heading text-gray-800">{suggestion.label}</span>
+                    </p>
+                    {stalled && (
+                      <span className="chip bg-amber-100 text-amber-700 border border-amber-200">
+                        Estancado 3 sesiones
+                      </span>
+                    )}
+                    {suggestion.weight != null && (
+                      <button
+                        onClick={() => fillWithSuggestion(pe.id, suggestion.weight, pe.reps)}
+                        className="text-[11px] font-heading px-2.5 py-1 rounded-full bg-meadow-100 border border-meadow-200 text-meadow-700 active:scale-95 transition"
+                      >
+                        Rellenar {suggestion.weight} kg
+                      </button>
+                    )}
+                  </div>
+                )}
+                {stalled && (!suggestion || last?.weight_kg == null) && (
+                  <p className="mt-2 text-[11px] font-heading text-amber-600">
+                    Llevas 3 sesiones clavado: prueba +1 rep o cambia variante
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setSubstituting(pe)}
@@ -678,6 +852,37 @@ export default function WorkoutSessionPage() {
         );
       })}
 
+      {missingWarning && (
+        <div className="cozy-card p-4 border-2 border-amber-200">
+          <p className="text-sm font-heading text-amber-700">
+            Tienes {missingWarning.missingWeight > 0 ? `${missingWarning.missingWeight} series sin peso` : ""}
+            {missingWarning.missingWeight > 0 && missingWarning.missingReps > 0 ? " y " : ""}
+            {missingWarning.missingReps > 0 ? `${missingWarning.missingReps} sin reps` : ""}.
+          </p>
+          {missingWarning.emptyExercises.length > 0 && (
+            <p className="text-xs text-gray-500 mt-1 capitalize">
+              Revisa: {missingWarning.emptyExercises.join(", ")}
+            </p>
+          )}
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => {
+                setMissingWarning(null);
+                setConfirmFinish(false);
+              }}
+              className="flex-1 py-2 rounded-full border-2 border-wood-200 text-wood-700 text-sm font-heading"
+            >
+              Revisar
+            </button>
+            <button
+              onClick={handleFinish}
+              className="flex-1 py-2 rounded-full bg-amber-500 text-white text-sm font-heading"
+            >
+              Terminar igual
+            </button>
+          </div>
+        </div>
+      )}
       {finishError && (
         <div className="cozy-card p-4 border-2 border-pinky-200">
           <p className="text-sm font-heading text-pinky-600">No se ha guardado el entreno.</p>
@@ -693,7 +898,7 @@ export default function WorkoutSessionPage() {
         disabled={finishing}
         className="game-btn py-4 font-semibold text-lg mb-4 disabled:opacity-60"
       >
-        {finishing ? "Guardando..." : "Terminar entreno"}
+        {finishing ? "Guardando..." : confirmFinish ? "Confirmar y terminar" : "Terminar entreno"}
       </button>
 
       <ExercisePickerModal
@@ -711,6 +916,15 @@ export default function WorkoutSessionPage() {
         open={!!detailExercise}
         onClose={() => setDetailExercise(null)}
         exercises={exercises}
+        injuries={injuries}
+      />
+
+      <PainAssistantModal
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        dayName={day.name}
+        exercises={exercises}
+        dayExercises={day.exercises}
         injuries={injuries}
       />
     </div>

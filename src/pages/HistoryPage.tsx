@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CalendarCheck, Clock, Dumbbell, Flame, Zap, HeartPulse } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
-import { fetchHistory } from "../lib/sessionsApi";
+import { fetchHistory, cleanupGhostSessions } from "../lib/sessionsApi";
 import { SESSION_TYPE_INFO, formatDuration } from "../lib/sessionTypes";
 import type { SessionType, WorkoutSession } from "../types/plan";
 import LoadingScreen from "../components/LoadingScreen";
@@ -26,21 +26,54 @@ export default function HistoryPage() {
   const name = useProfileStore((s) => s.name);
   const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cleaning, setCleaning] = useState(false);
 
-  useEffect(() => {
+  function load() {
     if (!name) return;
+    setLoading(true);
     fetchHistory(name)
       .then(setSessions)
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
+
+  async function handleCleanGhosts() {
+    if (!name || cleaning) return;
+    setCleaning(true);
+    try {
+      // 0h = borra todos los sin terminar (la sesión en curso se recrea al entrar).
+      await cleanupGhostSessions(name, null, 0);
+      const fresh = await fetchHistory(name);
+      setSessions(fresh);
+    } finally {
+      setCleaning(false);
+    }
+  }
 
   if (loading) return <LoadingScreen label="Buscando tu historial..." />;
 
+  const ghosts = sessions.filter((s) => !s.completed_at).length;
+
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="font-heading text-2xl text-bubble-700">Historial</h1>
-        <p className="text-sm text-bubble-400">Cada entreno cuenta, reina</p>
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl text-bubble-700">Historial</h1>
+          <p className="text-sm text-bubble-400">Cada entreno cuenta, reina</p>
+        </div>
+        {ghosts > 0 && (
+          <button
+            onClick={handleCleanGhosts}
+            disabled={cleaning}
+            className="text-xs font-heading px-3 py-1.5 rounded-full border-2 border-wood-200 text-wood-600 disabled:opacity-60"
+          >
+            {cleaning ? "Limpiando..." : `Limpiar ${ghosts} sin terminar`}
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col gap-2.5">

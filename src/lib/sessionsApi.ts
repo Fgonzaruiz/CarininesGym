@@ -373,3 +373,124 @@ export async function fetchStats(owner: string) {
 
   return { thisWeek, total, lastSession: completed[0] ?? null };
 }
+
+export interface RecentPoint {
+  date: string;
+  maxWeight: number;
+  maxReps: number;
+  sets: number;
+}
+
+/**
+ * Últimas sesiones con marca por ejercicio (para sugerencia + estancamiento).
+ * Una sola query de sesiones + una de logs, agrupado en memoria.
+ */
+export async function fetchRecentProgression(
+  owner: string,
+  exerciseIds: string[],
+  perExerciseSessions = 4
+): Promise<Map<string, RecentPoint[]>> {
+  const out = new Map<string, RecentPoint[]>();
+  if (exerciseIds.length === 0) return out;
+
+  const { data: sessions, error: sErr } = await supabase
+    .from("workout_sessions")
+    .select("id, started_at")
+    .eq("owner", owner)
+    .not("completed_at", "is", null)
+    .order("started_at", { ascending: false })
+    .limit(30);
+  if (sErr) throw sErr;
+  const sessionIds = (sessions ?? []).map((s) => s.id);
+  if (sessionIds.length === 0) return out;
+  const dateBySession = new Map((sessions ?? []).map((s) => [s.id, s.started_at.slice(0, 10)]));
+
+  const { data: logs, error: lErr } = await supabase
+    .from("workout_set_logs")
+    .select("session_id, exercise_id, weight_kg, reps_done")
+    .in("session_id", sessionIds)
+    .in("exercise_id", exerciseIds)
+    .eq("completed", true);
+  if (lErr) throw lErr;
+
+  const byExSession = new Map<string, RecentPoint & { sessionId: string }>();
+  for (const log of logs ?? []) {
+    const key = `${log.exercise_id}:${log.session_id}`;
+    const w = Number(log.weight_kg) || 0;
+    const r = Number(log.reps_done) || 0;
+    const cur = byExSession.get(key);
+    if (!cur) {
+      byExSession.set(key, {
+        sessionId: log.session_id,
+        date: dateBySession.get(log.session_id) ?? "",
+        maxWeight: w,
+        maxReps: r,
+        sets: 1,
+      });
+    } else {
+      cur.maxWeight = Math.max(cur.maxWeight, w);
+      cur.maxReps = Math.max(cur.maxReps, r);
+      cur.sets += 1;
+    }
+  }
+
+  const grouped = new Map<string, (RecentPoint & { sessionId: string })[]>();
+  for (const [key, p] of byExSession) {
+    const eid = key.split(":")[0];
+    const list = grouped.get(eid) ?? [];
+    list.push(p);
+    grouped.set(eid, list);
+  }
+  for (const [eid, list] of grouped) {
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    out.set(
+      eid,
+      list.slice(-perExerciseSessions).map(({ date, maxWeight, maxReps, sets }) => ({
+        date,
+        maxWeight,
+        maxReps,
+        sets,
+      }))
+    );
+  }
+  return out;
+}
+
+/** Sesiones fantasma: empezadas pero nunca terminadas. */
+export async function fetchGhostSessions(owner: string): Promise<WorkoutSession[]> {
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .select("*")
+    .eq("owner", owner)
+    .is("completed_at", null)
+    .order("started_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Borra fantasmas antiguos (por defecto >12h) sin tocar la sesión en curso.
+ * Devuelve cuántas borró.
+ */
+export async function cleanupGhostSessions(
+  owner: string,
+  excludeSessionId?: string | null,
+  olderThanHours = 12
+): Promise<number> {
+  const ghosts = await fetchGhostSessions(owner);
+  const cutoff = Date.now() - olderThanHours * 3600 * 1000;
+  const stale = ghosts.filter(
+    (g) => g.id !== excludeSessionId && new Date(g.started_at).getTime() < cutoff
+  );
+  if (stale.length === 0) return 0;
+  const { error } = await supabase
+    .from("workout_sessions")
+    .delete()
+    .in(
+      "id",
+      stale.map((s) => s.id)
+    );
+  if (error) throw error;
+  return stale.length;
+}
