@@ -33,12 +33,6 @@ import PainAssistantModal from "../components/PainAssistantModal";
 import type { Exercise } from "../types/exercise";
 import * as sessionsApi from "../lib/sessionsApi";
 import * as plansApi from "../lib/plansApi";
-import {
-  isMewtwoMonthPlan,
-  loadMewtwoProgress,
-  getWeekMeta,
-  onMewtwoSessionComplete,
-} from "../lib/mewtwoProgress";
 import type { PlanExercise, SessionType } from "../types/plan";
 import { SESSION_TYPES } from "../types/plan";
 import { CARININE_VOICE, pickRandom, isCarinineId } from "../types/profile";
@@ -80,7 +74,6 @@ export default function WorkoutSessionPage() {
   const [finishedDetail, setFinishedDetail] = useState<
     Partial<Record<MuscleKey, MuscleDetailItem[]>>
   >({});
-  const [weekAdvanceMessage, setWeekAdvanceMessage] = useState<string | null>(null);
   const [activeRest, setActiveRest] = useState<{ peId: string; seconds: number } | null>(null);
   const [hypeMessage] = useState(() =>
     name && isCarinineId(name) ? pickRandom(CARININE_VOICE[name].hypeMessages) : "Entreno completado"
@@ -461,25 +454,6 @@ export default function WorkoutSessionPage() {
       }
     }
 
-    if (name && plan && isMewtwoMonthPlan(plan)) {
-      try {
-        const history = await sessionsApi.fetchHistory(name, 80);
-        const beforeWeek = loadMewtwoProgress(name).week;
-        const after = onMewtwoSessionComplete(name, plan, history);
-        if (after.week !== beforeWeek) {
-          const meta = getWeekMeta(after.week);
-          const voice = isCarinineId(name) ? CARININE_VOICE[name] : null;
-          setWeekAdvanceMessage(
-            after.week === 1 && beforeWeek === 4
-              ? voice?.monthDone ?? "Mes completado. Nuevo ciclo."
-              : voice?.weekUnlocked(meta.title) ?? `Semana desbloqueada: ${meta.title}`
-          );
-        }
-      } catch {
-        // Si falla el avance de semana (p. ej. sin conexión) el entreno ya está guardado.
-      }
-    }
-
     setFinishing(false);
     setConfirmFinish(false);
     setFinished(true);
@@ -608,25 +582,6 @@ export default function WorkoutSessionPage() {
       }
     }
 
-    if (name && plan && isMewtwoMonthPlan(plan)) {
-      try {
-        const history = await sessionsApi.fetchHistory(name, 80);
-        const beforeWeek = loadMewtwoProgress(name).week;
-        const after = onMewtwoSessionComplete(name, plan, history);
-        if (after.week !== beforeWeek) {
-          const meta = getWeekMeta(after.week);
-          const voice = isCarinineId(name) ? CARININE_VOICE[name] : null;
-          setWeekAdvanceMessage(
-            after.week === 1 && beforeWeek === 4
-              ? voice?.monthDone ?? "Mes completado. Nuevo ciclo."
-              : voice?.weekUnlocked(meta.title) ?? `Semana desbloqueada: ${meta.title}`
-          );
-        }
-      } catch {
-        // Si falla el avance de semana el entreno ya está guardado.
-      }
-    }
-
     setFinishing(false);
     setFinished(true);
   }
@@ -663,11 +618,6 @@ export default function WorkoutSessionPage() {
         <p className="text-gray-500">
           "{day.name}" · {SESSION_TYPE_INFO[sessionType].label} guardado. {finishNote}
         </p>
-        {weekAdvanceMessage && (
-          <p className={`text-sm font-heading px-4 ${name === "Knifey" ? "text-psychic-600" : "text-meadow-600"}`}>
-            {weekAdvanceMessage}
-          </p>
-        )}
 
         {prs.length > 0 && (
           <div className="cozy-card p-4 w-full max-w-md border-2 border-amber-200">

@@ -22,7 +22,7 @@ export const usePlansStore = create<PlansState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       await api.seedDefaultPlanIfNeeded(owner);
-      await api.upgradeMewtwoPlanIfNeeded(owner);
+      await api.upgradeKnifeyPlanIfNeeded(owner);
       await api.ensureRoutinePlanIfNeeded(owner);
       const plans = await api.fetchPlans(owner);
       set({ plans, loading: false, loaded: true });
@@ -38,7 +38,7 @@ export const usePlansStore = create<PlansState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       await api.seedDefaultPlanIfNeeded(owner);
-      await api.upgradeMewtwoPlanIfNeeded(owner);
+      await api.upgradeKnifeyPlanIfNeeded(owner);
       await api.ensureRoutinePlanIfNeeded(owner);
       const plans = await api.fetchPlans(owner);
       set({ plans, loading: false, loaded: true });

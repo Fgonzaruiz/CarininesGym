@@ -13,12 +13,6 @@ import { useProfileStore } from "../store/profileStore";
 import { usePlansStore } from "../store/plansStore";
 import { CARININES, CARININE_VOICE, pickRandom } from "../types/profile";
 import { fetchHistory, fetchStats } from "../lib/sessionsApi";
-import {
-  getNextMewtwoDay,
-  isMewtwoMonthPlan,
-  loadMewtwoProgress,
-  getWeekMeta,
-} from "../lib/mewtwoProgress";
 import { classDayKindFromName, CLASS_DAY_META } from "../lib/classDays";
 import LoadingScreen from "../components/LoadingScreen";
 import QuickLogModal from "../components/QuickLogModal";
@@ -81,32 +75,16 @@ export default function HomePage() {
 
   const mainPlan = plans.find((p) => p.is_default) ?? plans[0];
 
+  // La semana se repite: rota por los dias segun entrenos completados.
   const nextWorkout = useMemo(() => {
     if (!mainPlan || mainPlan.days.length === 0) return null;
-
-    if (isMewtwoMonthPlan(mainPlan) && name) {
-      const mewtwo = getNextMewtwoDay(mainPlan, name, history);
-      if (mewtwo) {
-        return {
-          day: mewtwo.day,
-          weekLabel: mewtwo.weekTitle,
-          weekProgress: `${mewtwo.completedInWeek}/${mewtwo.totalInWeek} esta semana`,
-        };
-      }
-    }
 
     const completedForPlan = history.filter(
       (h) => h.plan_id === mainPlan.id && h.completed_at
     ).length;
     const day = mainPlan.days[completedForPlan % mainPlan.days.length];
-    return { day, weekLabel: null, weekProgress: null };
-  }, [mainPlan, history, name]);
-
-  const mewtwoWeek = useMemo(() => {
-    if (!name || !mainPlan || !isMewtwoMonthPlan(mainPlan)) return null;
-    const progress = loadMewtwoProgress(name);
-    return getWeekMeta(progress.week);
-  }, [name, mainPlan, history]);
+    return { day };
+  }, [mainPlan, history]);
 
   if (loading && plans.length === 0) return <LoadingScreen />;
 
@@ -153,21 +131,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {mewtwoWeek && (
-        <div className="cozy-card p-4 knifey-card">
-          <p className="text-xs font-heading uppercase tracking-widest text-gray-500">
-            Fase Mewtwo · Semana {mewtwoWeek.week} de 4
-          </p>
-          <p className="font-heading text-gray-800 mt-1">{mewtwoWeek.title}</p>
-          <p className="text-xs text-gray-500 mt-1">{mewtwoWeek.subtitle}</p>
-        </div>
-      )}
-
       {mainPlan && nextWorkout ? (
         <div className={`cozy-card p-5 ${isKnifey ? "knifey-card" : ""}`}>
           <p className="text-xs font-heading text-gray-500 mb-1">
             Proximo dia · {mainPlan.name}
-            {nextWorkout.weekLabel ? ` · ${nextWorkout.weekLabel}` : ""}
           </p>
           <p className="font-heading text-lg text-gray-800">{nextWorkout.day.name}</p>
           <p className="text-xs text-gray-500 mb-4">
@@ -175,7 +142,6 @@ export default function HomePage() {
               const kind = classDayKindFromName(nextWorkout.day.name);
               return kind ? `clase ${CLASS_DAY_META[kind].durationLabel}` : `${nextWorkout.day.exercises.length} ejercicios`;
             })()}
-            {nextWorkout.weekProgress ? ` · ${nextWorkout.weekProgress}` : ""}
           </p>
           <Link
             to={`/entrenar/${mainPlan.id}/${nextWorkout.day.id}`}

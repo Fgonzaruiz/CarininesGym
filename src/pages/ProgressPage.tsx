@@ -14,7 +14,6 @@ import {
 } from "../lib/sessionsApi";
 import { useExercises } from "../hooks/useExercises";
 import { muscleKeyForTarget, type MuscleKey } from "../lib/muscleMap";
-import { clearMewtwoProgress } from "../lib/mewtwoProgress";
 import type { Exercise } from "../types/exercise";
 import LoadingScreen from "../components/LoadingScreen";
 import ExerciseProgressChart from "../components/ExerciseProgressChart";
@@ -130,7 +129,6 @@ export default function ProgressPage() {
     setClearing(true);
     try {
       await clearAllProgress(name);
-      clearMewtwoProgress(name);
       setEvolution([]);
       setStats({ thisWeek: 0, total: 0 });
       setExpandedId(null);
