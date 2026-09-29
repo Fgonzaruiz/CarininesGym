@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { FASE_MEWTWO_FLAT_DAYS, FASE_MEWTWO_PLAN } from "../data/defaultPlan";
+import { classDayKindFromName, CLASS_VIRTUAL_IDS } from "./classDays";
 import type { SeedDay } from "../data/defaultPlan";
 import { RUTINA_5_DIAS_PLAN } from "../data/routine5dias";
 import type { Plan, PlanDay, PlanExercise } from "../types/plan";
@@ -166,7 +167,14 @@ export async function ensureRoutinePlanIfNeeded(owner: string): Promise<void> {
   );
 }
 
-/** Añade semanas 2-4 si Knifey ya tenia el plan antiguo de 4 dias. */
+/**
+ * Migra el plan de Knifey al formato actual (5 dias/semana con YOGA, HYBRID y
+ * tren superior con dominadas asistidas).
+ * - Si el plan es antiguo (16 dias de 4/semana o sin dias YOGA/HYBRID/Tren superior),
+ *   reconstruye los dias con la estructura nueva. El historial se conserva porque
+ *   workout_sessions.plan_day_id es ON DELETE SET NULL.
+ * - Si es un plan nuevo a medias, solo añade los dias que falten.
+ */
 export async function upgradeMewtwoPlanIfNeeded(owner: string): Promise<void> {
   if (owner !== "Knifey") return;
 
@@ -182,19 +190,65 @@ export async function upgradeMewtwoPlanIfNeeded(owner: string): Promise<void> {
 
   const { data: days, error: daysError } = await supabase
     .from("plan_days")
-    .select("id")
+    .select("id, name")
     .eq("plan_id", mewtwo.id)
     .order("day_index", { ascending: true });
   if (daysError) throw daysError;
 
   const dayCount = days?.length ?? 0;
   const targetCount = FASE_MEWTWO_FLAT_DAYS.length;
+  const names = (days ?? []).map((d) => (d.name ?? "").toLowerCase());
+  const hasNewStructure =
+    names.some((n) => n.includes("yoga")) &&
+    names.some((n) => n.includes("hybrid") || n.includes("hibrid")) &&
+    names.some((n) => n.includes("tren superior") || n.includes("dominada"));
 
   if (mewtwo.description !== FASE_MEWTWO_PLAN.description) {
     await supabase
       .from("plans")
       .update({ description: FASE_MEWTWO_PLAN.description })
       .eq("id", mewtwo.id);
+  }
+
+  // Los dias de clase deben ser un bloque unico (id virtual). Si tienen
+  // subdivisiones es una version anterior: reconstruir.
+  let classDaysAreSingleBlock = hasNewStructure;
+  if (hasNewStructure) {
+    const classDayIds = (days ?? [])
+      .filter((d) => classDayKindFromName(d.name))
+      .map((d) => d.id);
+    if (classDayIds.length > 0) {
+      const { data: classExs, error: classExsError } = await supabase
+        .from("plan_exercises")
+        .select("plan_day_id, exercise_id")
+        .in("plan_day_id", classDayIds);
+      if (classExsError) throw classExsError;
+      const byDay = new Map<string, string[]>();
+      for (const row of classExs ?? []) {
+        const list = byDay.get(row.plan_day_id) ?? [];
+        list.push(row.exercise_id);
+        byDay.set(row.plan_day_id, list);
+      }
+      const virtualIds = new Set(Object.values(CLASS_VIRTUAL_IDS));
+      for (const dayId of classDayIds) {
+        const ids = byDay.get(dayId) ?? [];
+        if (ids.length !== 1 || !virtualIds.has(ids[0])) {
+          classDaysAreSingleBlock = false;
+          break;
+        }
+      }
+    }
+  }
+
+  // Plan antiguo (4 dias/semana) o estructura distinta: reconstruir.
+  if (!hasNewStructure || !classDaysAreSingleBlock) {
+    const { error: deleteError } = await supabase
+      .from("plan_days")
+      .delete()
+      .eq("plan_id", mewtwo.id);
+    if (deleteError) throw deleteError;
+    await insertMewtwoDays(mewtwo.id, FASE_MEWTWO_FLAT_DAYS, 0);
+    return;
   }
 
   if (dayCount >= targetCount) return;

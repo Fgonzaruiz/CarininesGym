@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dumbbell, Flame, Zap, HeartPulse, CheckCircle2 } from "lucide-react";
+import { Dumbbell, Flame, Zap, HeartPulse, Flower2, CheckCircle2 } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { SESSION_TYPE_INFO } from "../lib/sessionTypes";
 import { SESSION_TYPES, type SessionType } from "../types/plan";
@@ -13,6 +13,7 @@ const TYPE_ICONS: Record<SessionType, typeof Dumbbell> = {
   tabata: Flame,
   hybrid: Zap,
   cardio: HeartPulse,
+  yoga: Flower2,
 };
 
 export default function QuickLogModal({

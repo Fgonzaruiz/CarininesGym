@@ -42,9 +42,9 @@ export interface SetLog {
   created_at?: string;
 }
 
-export type SessionType = "fuerza" | "tabata" | "hybrid" | "cardio";
+export type SessionType = "fuerza" | "tabata" | "hybrid" | "cardio" | "yoga";
 
-export const SESSION_TYPES: SessionType[] = ["fuerza", "tabata", "hybrid", "cardio"];
+export const SESSION_TYPES: SessionType[] = ["fuerza", "tabata", "hybrid", "cardio", "yoga"];
 
 export interface WorkoutSession {
   id: string;

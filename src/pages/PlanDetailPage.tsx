@@ -35,8 +35,12 @@ import {
   generatedPlanWeeks,
 } from "../lib/planGenerator";
 import { SESSION_TYPE_INFO, sessionTypeFromDayName } from "../lib/sessionTypes";
+import { previewCountsForDay, mergeMuscleCounts } from "../lib/dayMuscles";
+import { classDayKindFromName, CLASS_DAY_META } from "../lib/classDays";
+import type { Exercise } from "../types/exercise";
 import LoadingScreen from "../components/LoadingScreen";
 import Modal from "../components/Modal";
+import MuscleMap from "../components/MuscleMap";
 import ExercisePickerModal from "../components/ExercisePickerModal";
 
 export default function PlanDetailPage() {
@@ -78,6 +82,28 @@ export default function PlanDetailPage() {
     for (const ex of exercises) map.set(ex.id, ex);
     return map;
   }, [exercises]);
+
+  /** Catálogo tipado para calcular músculos por día (preview automática). */
+  const catalogById = useMemo(() => {
+    return new Map<string, Exercise>(exercises.map((e) => [e.id, e]));
+  }, [exercises]);
+
+  /** Músculos por día: se calculan del catálogo, sin entrenar nada. */
+  const dayCountsById = useMemo(() => {
+    if (!plan) return new Map<string, Record<string, number>>();
+    const out = new Map<string, Record<string, number>>();
+    for (const day of plan.days) {
+      out.set(
+        day.id,
+        previewCountsForDay(
+          day.name,
+          day.exercises.map((pe) => pe.exercise_id),
+          catalogById
+        )
+      );
+    }
+    return out;
+  }, [plan, catalogById]);
 
   const mewtwoProgress = useMemo(() => {
     if (!name || !plan || !isMewtwoMonthPlan(plan)) return null;
@@ -206,6 +232,8 @@ export default function PlanDetailPage() {
   function renderDayCard(day: (typeof currentPlan.days)[number], dayIdx: number) {
     const isOpen = openDay === day.id;
     const dayType = sessionTypeFromDayName(day.name);
+    const classKind = classDayKindFromName(day.name);
+    const classMeta = classKind ? CLASS_DAY_META[classKind] : null;
     return (
       <div key={day.id} className="kawaii-card overflow-hidden">
         <button
@@ -224,7 +252,9 @@ export default function PlanDetailPage() {
                 </span>
               )}
             </div>
-            <p className="text-xs text-bubble-400">{day.exercises.length} ejercicios</p>
+            <p className="text-xs text-bubble-400">
+              {classMeta ? `clase ${classMeta.durationLabel}` : `${day.exercises.length} ejercicios`}
+            </p>
           </div>
           {isOpen ? (
             <ChevronUp size={18} className="text-bubble-300" />
@@ -233,7 +263,48 @@ export default function PlanDetailPage() {
           )}
         </button>
 
-        {isOpen && (
+        {isOpen && classMeta && (
+          <div className="px-4 pb-4 flex flex-col gap-2.5">
+            <div className="rounded-2xl bg-bubble-50/70 p-4 text-center">
+              <p className="font-heading text-2xl text-bubble-700 tracking-wide">
+                {classMeta.classLabel}
+              </p>
+              <p className="text-xs text-bubble-400 mt-1">{classMeta.description}</p>
+              {day.exercises[0]?.notes && (
+                <p className="text-[11px] text-pinky-500 mt-1.5">{day.exercises[0].notes}</p>
+              )}
+            </div>
+
+            {(() => {
+              const counts = dayCountsById.get(day.id);
+              if (!counts || Object.keys(counts).length === 0) return null;
+              return (
+                <div className="rounded-2xl border border-wood-200 bg-wood-50/50 p-3">
+                  <p className="text-[11px] font-heading text-wood-600 mb-2">
+                    Al completar la clase se registra todo esto
+                  </p>
+                  <MuscleMap
+                    counts={counts}
+                    periodLabel="Ejercicios"
+                    summaryLabel="en esta clase"
+                    untrained={[]}
+                  />
+                </div>
+              );
+            })()}
+
+            {day.exercises.length > 0 && (
+              <button
+                onClick={() => navigate(`/entrenar/${currentPlan.id}/${day.id}`)}
+                className="btn-kawaii py-3 font-semibold flex items-center justify-center gap-2 mt-1"
+              >
+                <Play size={16} /> Empezar entreno
+              </button>
+            )}
+          </div>
+        )}
+
+        {isOpen && !classMeta && (
           <div className="px-4 pb-4 flex flex-col gap-2.5">
             {day.exercises.map((pe) => {
               const ex = exerciseMap.get(pe.exercise_id);
@@ -300,6 +371,24 @@ export default function PlanDetailPage() {
               );
             })}
 
+            {(() => {
+              const counts = dayCountsById.get(day.id);
+              if (!counts || Object.keys(counts).length === 0) return null;
+              return (
+                <div className="rounded-2xl border border-wood-200 bg-wood-50/50 p-3 mt-1">
+                  <p className="text-[11px] font-heading text-wood-600 mb-2">
+                    Músculos de este día · se iluminan solos al abrirlo
+                  </p>
+                  <MuscleMap
+                    counts={counts}
+                    periodLabel="Ejercicios"
+                    summaryLabel="en este día"
+                    untrained={[]}
+                  />
+                </div>
+              );
+            })()}
+
             <div className="flex gap-2 mt-1">
               <button
                 onClick={() => setPickerForDay(day.id)}
@@ -363,26 +452,44 @@ export default function PlanDetailPage() {
 
       <div className="flex flex-col gap-3">
         {mewtwoWeekGroups
-          ? mewtwoWeekGroups.map((group) => (
-              <div key={group.week} className="flex flex-col gap-2">
-                <div
-                  className={`rounded-2xl px-4 py-3 ${
-                    group.week === mewtwoProgress?.week
-                      ? "bg-psychic-50 border border-psychic-200"
-                      : "bg-bubble-50/60"
-                  }`}
-                >
-                  <p className="font-heading text-bubble-700">{group.meta.title}</p>
-                  <p className="text-xs text-bubble-400 mt-0.5">{group.meta.subtitle}</p>
-                  {group.week === mewtwoProgress?.week && (
-                    <span className="inline-block mt-2 chip bg-psychic-100 text-psychic-700 text-[11px]">
-                      Semana actual
-                    </span>
-                  )}
+          ? mewtwoWeekGroups.map((group) => {
+              const weekCounts = mergeMuscleCounts(
+                group.days.map((d) => dayCountsById.get(d.id) ?? {})
+              );
+              const hasWeekMuscles = Object.keys(weekCounts).length > 0;
+              return (
+                <div key={group.week} className="flex flex-col gap-2">
+                  <div
+                    className={`rounded-2xl px-4 py-3 ${
+                      group.week === mewtwoProgress?.week
+                        ? "bg-psychic-50 border border-psychic-200"
+                        : "bg-bubble-50/60"
+                    }`}
+                  >
+                    <p className="font-heading text-bubble-700">{group.meta.title}</p>
+                    <p className="text-xs text-bubble-400 mt-0.5">{group.meta.subtitle}</p>
+                    {group.week === mewtwoProgress?.week && (
+                      <span className="inline-block mt-2 chip bg-psychic-100 text-psychic-700 text-[11px]">
+                        Semana actual
+                      </span>
+                    )}
+                    {hasWeekMuscles && (
+                      <div className="mt-3 rounded-2xl bg-white/70 p-3">
+                        <p className="text-[11px] font-heading text-bubble-500 mb-2">
+                          Músculos de la semana · suma de los 5 días
+                        </p>
+                        <MuscleMap
+                          counts={weekCounts}
+                          periodLabel="Ejercicios"
+                          summaryLabel={`en semana ${group.week}`}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {group.days.map((day, idx) => renderDayCard(day, idx))}
                 </div>
-                {group.days.map((day, idx) => renderDayCard(day, idx))}
-              </div>
-            ))
+              );
+            })
           : generatedWeeks
             ? generatedWeeks.map((group) => (
                 <div key={group.week} className="flex flex-col gap-2">

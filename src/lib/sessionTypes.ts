@@ -43,12 +43,28 @@ export const SESSION_TYPE_INFO: Record<SessionType, SessionTypeInfo> = {
     iconClass: "bg-gradient-to-br from-sky-glow-400 to-sky-glow-600",
     defaultDurationMinutes: 30,
   },
+  yoga: {
+    label: "Yoga",
+    shortLabel: "Yoga",
+    description: "Movilidad, respiración y flexibilidad. Clase GoFit de 1 hora.",
+    chipClass: "bg-meadow-100 text-meadow-700",
+    iconClass: "bg-gradient-to-br from-meadow-300 to-meadow-600",
+    defaultDurationMinutes: 60,
+  },
 };
 
-/** Detecta el tipo de sesión por el nombre del día ("Tabata", "Cardio", "Hybrid"...). */
+/** Detecta el tipo de sesión por el nombre del día ("Tabata", "Cardio", "Hybrid", "Yoga"...). */
 export function sessionTypeFromDayName(name: string | undefined | null): SessionType | null {
   if (!name) return null;
-  const n = name.toLowerCase();
+  const n = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  // Aliases antes del match directo (hibrido con/sin tilde, yoga, tren superior...)
+  if (n.includes("yoga")) return "yoga";
+  if (n.includes("hybrid") || n.includes("hibrid")) return "hybrid";
+  if (n.includes("tabata")) return "tabata";
+  if (n.includes("cardio")) return "cardio";
   for (const t of Object.keys(SESSION_TYPE_INFO) as SessionType[]) {
     if (n.includes(t)) return t;
   }

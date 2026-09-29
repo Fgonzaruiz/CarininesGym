@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalendarCheck, Clock, Dumbbell, Flame, Zap, HeartPulse } from "lucide-react";
+import { CalendarCheck, Clock, Dumbbell, Flame, Zap, HeartPulse, Flower2 } from "lucide-react";
 import { useProfileStore } from "../store/profileStore";
 import { fetchHistory, cleanupGhostSessions } from "../lib/sessionsApi";
 import { SESSION_TYPE_INFO, formatDuration } from "../lib/sessionTypes";
@@ -11,6 +11,7 @@ const TYPE_ICONS: Record<SessionType, typeof Dumbbell> = {
   tabata: Flame,
   hybrid: Zap,
   cardio: HeartPulse,
+  yoga: Flower2,
 };
 
 function formatDate(iso: string) {

@@ -25,6 +25,8 @@ import {
   unsafeEquipmentHint,
 } from "../lib/injuries";
 import { SESSION_TYPE_INFO, sessionTypeFromDayName } from "../lib/sessionTypes";
+import { classDayKindFromName, CLASS_DAY_META } from "../lib/classDays";
+import { previewCountsForDay } from "../lib/dayMuscles";
 import { muscleKeyForTarget, MUSCLE_KEYS, type MuscleKey } from "../lib/muscleMap";
 import MuscleMap, { type MuscleDetailItem } from "../components/MuscleMap";
 import PainAssistantModal from "../components/PainAssistantModal";
@@ -495,6 +497,140 @@ export default function WorkoutSessionPage() {
     setSubstituting(null);
   }
 
+  const classKind = day ? classDayKindFromName(day.name) : null;
+  const classMeta = classKind ? CLASS_DAY_META[classKind] : null;
+
+  /**
+   * Día de clase (YOGA/HYBRID): un solo toque registra la clase completa
+   * con todo lo entrenado, sin subdivisiones.
+   */
+  async function handleFinishClass() {
+    if (finishing || !name || !plan || !day || !classMeta) return;
+    setFinishing(true);
+    setFinishError(null);
+    try {
+      let sid = sessionId;
+      if (!sid) {
+        const created = await sessionsApi.startSession(
+          name,
+          plan.id,
+          day.id,
+          day.name,
+          classMeta.sessionType
+        );
+        setSessionId(created.id);
+        sid = created.id;
+        sessionsApi.cleanupGhostSessions(name, created.id).catch(() => {});
+      } else {
+        await sessionsApi.updateSession(sid, {
+          session_type: classMeta.sessionType,
+          duration_minutes: classMeta.minutes,
+        });
+      }
+
+      const pe = day.exercises[0];
+      const exById = new Map(exercises.map((e) => [e.id, e]));
+      let idx = 0;
+      for (const repId of classMeta.repExerciseIds) {
+        const ex = exById.get(repId);
+        if (!ex) continue;
+        await sessionsApi.upsertSetLog({
+          session_id: sid,
+          plan_exercise_id: pe ? pe.id : day.id,
+          exercise_id: repId,
+          exercise_name: ex.name,
+          set_index: idx++,
+          reps_done: null,
+          weight_kg: null,
+          completed: true,
+        });
+      }
+
+      await sessionsApi.completeSession(sid);
+    } catch (err) {
+      setFinishError(describeError(err));
+      setFinishing(false);
+      return;
+    }
+
+    // Pantalla final: todo lo que ha trabajado la clase, de golpe.
+    const todayCounts: Record<string, number> = {};
+    const detailMap = new Map<MuscleKey, Map<string, MuscleDetailItem>>();
+    const exById = new Map(exercises.map((e) => [e.id, e]));
+    for (const repId of classMeta.repExerciseIds) {
+      const ex = exById.get(repId);
+      if (!ex) continue;
+      const ms = new Set<MuscleKey>();
+      const t = muscleKeyForTarget(ex.target);
+      if (t) ms.add(t);
+      for (const sec of ex.secondary_muscles) {
+        const k = muscleKeyForTarget(sec);
+        if (k) ms.add(k);
+      }
+      for (const m of ms) {
+        todayCounts[m] = 1;
+        let map = detailMap.get(m);
+        if (!map) {
+          map = new Map();
+          detailMap.set(m, map);
+        }
+        if (!map.has(ex.id)) map.set(ex.id, { id: ex.id, name: ex.name, sessions: 1 });
+      }
+    }
+    const detail: Partial<Record<MuscleKey, MuscleDetailItem[]>> = {};
+    for (const [m, map] of detailMap) {
+      detail[m] = Array.from(map.values());
+    }
+    setFinishedCounts(todayCounts);
+    setFinishedDetail(detail);
+
+    if (name) {
+      try {
+        const weekMap = await sessionsApi.fetchExerciseIdsBySessionInRange(name, "week");
+        const weekCounts: Record<string, number> = {};
+        for (const exIds of weekMap.values()) {
+          const muscles = new Set<MuscleKey>();
+          for (const eid of exIds) {
+            const ex = exById.get(eid);
+            if (!ex) continue;
+            const t = muscleKeyForTarget(ex.target);
+            if (t) muscles.add(t);
+            for (const sec of ex.secondary_muscles) {
+              const k = muscleKeyForTarget(sec);
+              if (k) muscles.add(k);
+            }
+          }
+          for (const m of muscles) weekCounts[m] = (weekCounts[m] ?? 0) + 1;
+        }
+        setFinishedUntrained(MUSCLE_KEYS.filter((k) => !((weekCounts[k] ?? 0) > 0)));
+      } catch {
+        setFinishedUntrained([]);
+      }
+    }
+
+    if (name && plan && isMewtwoMonthPlan(plan)) {
+      try {
+        const history = await sessionsApi.fetchHistory(name, 80);
+        const beforeWeek = loadMewtwoProgress(name).week;
+        const after = onMewtwoSessionComplete(name, plan, history);
+        if (after.week !== beforeWeek) {
+          const meta = getWeekMeta(after.week);
+          const voice = isCarinineId(name) ? CARININE_VOICE[name] : null;
+          setWeekAdvanceMessage(
+            after.week === 1 && beforeWeek === 4
+              ? voice?.monthDone ?? "Mes completado. Nuevo ciclo."
+              : voice?.weekUnlocked(meta.title) ?? `Semana desbloqueada: ${meta.title}`
+          );
+        }
+      } catch {
+        // Si falla el avance de semana el entreno ya está guardado.
+      }
+    }
+
+    setFinishing(false);
+    setFinished(true);
+  }
+
   if (!name || exLoading || !plan) return <LoadingScreen label="Preparando entreno..." />;
   if (!day) {
     return (
@@ -590,6 +726,72 @@ export default function WorkoutSessionPage() {
           exercises={exercises}
           injuries={injuries}
         />
+      </div>
+    );
+  }
+
+  // Día de clase: solo se ve YOGA/HYBRID y un botón para completarla entera.
+  if (classKind && classMeta && day) {
+    const preview = previewCountsForDay(day.name, [], exerciseMap);
+    return (
+      <div className="game-bg min-h-screen max-w-3xl mx-auto px-4 pt-4 pb-10 flex flex-col gap-4">
+        <button
+          onClick={() => navigate(`/planes/${plan?.id}`)}
+          className="flex items-center gap-1 text-sm text-gray-500 font-heading self-start"
+        >
+          <X size={16} /> Volver al plan
+        </button>
+
+        <div className="cozy-card p-6 text-center">
+          <p className="text-xs font-heading uppercase tracking-widest text-gray-400">
+            {day.name}
+          </p>
+          <h1 className="font-heading text-4xl text-gray-800 mt-2 tracking-wide">
+            {classMeta.classLabel}
+          </h1>
+          <p className="text-sm text-gray-500 mt-2">{classMeta.description}</p>
+          <span
+            className={`inline-block mt-3 chip border-transparent ${SESSION_TYPE_INFO[classMeta.sessionType].chipClass}`}
+          >
+            Clase {classMeta.durationLabel}
+          </span>
+        </div>
+
+        {Object.keys(preview).length > 0 && (
+          <div className="cozy-card p-4">
+            <h2 className="font-heading text-sm text-gray-700 mb-2">
+              Al completarla se registra todo esto 💪
+            </h2>
+            <MuscleMap
+              counts={preview}
+              periodLabel="Ejercicios"
+              summaryLabel="en esta clase"
+              untrained={[]}
+            />
+          </div>
+        )}
+
+        {sessionError && !sessionId && (
+          <div className="cozy-card p-4 border-2 border-pinky-200">
+            <p className="text-sm font-heading text-pinky-600">
+              Sin conexión: la clase se guardará al pulsar completar si hay red.
+            </p>
+          </div>
+        )}
+        {finishError && (
+          <div className="cozy-card p-4 border-2 border-pinky-200">
+            <p className="text-sm font-heading text-pinky-600">No se ha guardado la clase.</p>
+            <p className="text-xs text-gray-500 mt-1 break-words">{finishError}</p>
+          </div>
+        )}
+
+        <button
+          onClick={handleFinishClass}
+          disabled={finishing}
+          className="game-btn py-4 font-semibold text-lg mb-4 disabled:opacity-60"
+        >
+          {finishing ? "Guardando..." : `Completar clase ${classMeta.durationLabel}`}
+        </button>
       </div>
     );
   }

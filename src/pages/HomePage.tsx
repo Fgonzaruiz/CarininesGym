@@ -19,6 +19,7 @@ import {
   loadMewtwoProgress,
   getWeekMeta,
 } from "../lib/mewtwoProgress";
+import { classDayKindFromName, CLASS_DAY_META } from "../lib/classDays";
 import LoadingScreen from "../components/LoadingScreen";
 import QuickLogModal from "../components/QuickLogModal";
 import { PROTEIN_GOAL } from "../data/nutrition";
@@ -170,7 +171,10 @@ export default function HomePage() {
           </p>
           <p className="font-heading text-lg text-gray-800">{nextWorkout.day.name}</p>
           <p className="text-xs text-gray-500 mb-4">
-            {nextWorkout.day.exercises.length} ejercicios
+            {(() => {
+              const kind = classDayKindFromName(nextWorkout.day.name);
+              return kind ? `clase ${CLASS_DAY_META[kind].durationLabel}` : `${nextWorkout.day.exercises.length} ejercicios`;
+            })()}
             {nextWorkout.weekProgress ? ` · ${nextWorkout.weekProgress}` : ""}
           </p>
           <Link
